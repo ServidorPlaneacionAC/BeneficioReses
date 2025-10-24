@@ -371,7 +371,22 @@ with st.expander("Descargar plantilla de Excel"):
         pd.DataFrame({
             'ZONA': Zonas,
             'PESO': 400
-        }).to_excel(writer,sheet_name='PESORES',index=False)  
+        }).to_excel(writer,sheet_name='PESORES',index=False)
+        #Hoja de ejemplo para el precio por kg negociado en cada zona
+        pd.DataFrame({
+            'ZONA': Zonas,
+            'PRECIO': 8000
+        }).to_excel(writer,sheet_name='PRECIOKG',index=False)
+        #Hoja de ejemplo para el Costo de reses compradas en cada zona
+        pd.DataFrame({
+            'ZONA': Zonas,
+            'PRECIO': 2500000
+        }).to_excel(writer,sheet_name='CR_CROMPRADA',index=False)
+        #Hoja de ejemplo para el Costo de reses integradas en cada zona
+        pd.DataFrame({
+            'ZONA': Zonas,
+            'PRECIO': 1500000
+        }).to_excel(writer,sheet_name='CR_INTEGRADA',index=False)     
     
     st.download_button(
         label="Descargar plantilla",
