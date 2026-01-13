@@ -283,12 +283,23 @@ if uploaded_file is not None:
             df_costos = pd.DataFrame.from_dict(costos, orient='index', columns=['Valor ($)'])
             st.dataframe(df_costos.style.format("{:,.0f}"))
             # ------------------------------------------------------------
-            # COMPONENTE DE ANÁLISIS POR ZONA (NUEVO)
+            # COMPONENTE DE ANÁLISIS POR ZONA (NUEVO) - VERSIÓN CORREGIDA
             # ------------------------------------------------------------
             st.markdown("---")
             st.subheader("📊 Análisis Detallado por Zona")
             
-            # Seleccionador de zona
+            # Función auxiliar para obtener el valor de una variable PuLP
+            def obtener_valor_pulp(variable):
+                """Obtiene el valor de una variable PuLP, manejando diferentes tipos."""
+                if variable is None:
+                    return 0
+                elif hasattr(variable, 'varValue'):
+                    return variable.varValue if variable.varValue is not None else 0
+                elif isinstance(variable, (int, float)):
+                    return variable
+                else:
+                    return 0
+            
             if 'contexto' in st.session_state:
                 zonas_disponibles = contexto['Zona']
                 
@@ -312,9 +323,14 @@ if uploaded_file is not None:
                         
                         for t in semanas:
                             for p in plantas:
-                                res_int_val = contexto['variables']['res_int'].get((zona_seleccionada, p, t), 0)
-                                res_comp_val = contexto['variables']['res_comp'].get((zona_seleccionada, p, t), 0)
+                                # Obtener valores con manejo seguro
+                                res_int_var = contexto['variables']['res_int'].get((zona_seleccionada, p, t))
+                                res_comp_var = contexto['variables']['res_comp'].get((zona_seleccionada, p, t))
                                 
+                                res_int_val = obtener_valor_pulp(res_int_var)
+                                res_comp_val = obtener_valor_pulp(res_comp_var)
+                                
+                                # CORRECCIÓN: Verificar si hay valores positivos
                                 if res_int_val > 0 or res_comp_val > 0:
                                     # Obtener valores unitarios
                                     precio_int = contexto['parametros']['Precio_Int'].get(zona_seleccionada, 0)
@@ -325,26 +341,26 @@ if uploaded_file is not None:
                                     valor_kg = contexto['parametros']['valor_kg']
                                     
                                     # Calcular costos
-                                    costo_int_total = res_int_val * precio_int if res_int_val > 0 else 0
-                                    costo_comp_total = res_comp_val * precio_comp if res_comp_val > 0 else 0
-                                    costo_sac_int = res_int_val * costo_sac if res_int_val > 0 else 0
-                                    costo_sac_comp = res_comp_val * costo_sac if res_comp_val > 0 else 0
+                                    costo_int_total = res_int_val * precio_int
+                                    costo_comp_total = res_comp_val * precio_comp
+                                    costo_sac_int = res_int_val * costo_sac
+                                    costo_sac_comp = res_comp_val * costo_sac
                                     
                                     # Calcular ingresos
-                                    ingreso_int = res_int_val * peso_res * rendimiento * valor_kg if res_int_val > 0 else 0
-                                    ingreso_comp = res_comp_val * peso_res * rendimiento * valor_kg if res_comp_val > 0 else 0
+                                    ingreso_int = res_int_val * peso_res * rendimiento * valor_kg
+                                    ingreso_comp = res_comp_val * peso_res * rendimiento * valor_kg
                                     
                                     zona_data.append({
                                         'Semana': t,
                                         'Planta': p,
-                                        'Reses Integradas': int(res_int_val.varValue) if hasattr(res_int_val, 'varValue') else int(res_int_val),
-                                        'Reses Compradas': int(res_comp_val.varValue) if hasattr(res_comp_val, 'varValue') else int(res_comp_val),
-                                        'Costo Integración ($)': round(costo_int_total, 2) if hasattr(costo_int_total, 'varValue') else round(costo_int_total, 2),
-                                        'Costo Compras ($)': round(costo_comp_total, 2) if hasattr(costo_comp_total, 'varValue') else round(costo_comp_total, 2),
-                                        'Costo Sacrificio Int ($)': round(costo_sac_int, 2) if hasattr(costo_sac_int, 'varValue') else round(costo_sac_int, 2),
-                                        'Costo Sacrificio Comp ($)': round(costo_sac_comp, 2) if hasattr(costo_sac_comp, 'varValue') else round(costo_sac_comp, 2),
-                                        'Ingreso Carne Int ($)': round(ingreso_int, 2) if hasattr(ingreso_int, 'varValue') else round(ingreso_int, 2),
-                                        'Ingreso Carne Comp ($)': round(ingreso_comp, 2) if hasattr(ingreso_comp, 'varValue') else round(ingreso_comp, 2)
+                                        'Reses Integradas': int(res_int_val),
+                                        'Reses Compradas': int(res_comp_val),
+                                        'Costo Integración ($)': round(costo_int_total, 2),
+                                        'Costo Compras ($)': round(costo_comp_total, 2),
+                                        'Costo Sacrificio Int ($)': round(costo_sac_int, 2),
+                                        'Costo Sacrificio Comp ($)': round(costo_sac_comp, 2),
+                                        'Ingreso Carne Int ($)': round(ingreso_int, 2),
+                                        'Ingreso Carne Comp ($)': round(ingreso_comp, 2)
                                     })
                     
                     with col2:
@@ -353,11 +369,24 @@ if uploaded_file is not None:
                             df_zona = pd.DataFrame(zona_data)
                             
                             # Mostrar métricas resumidas
-                            st.metric(
-                                label="Total Reses en Zona",
-                                value=f"{df_zona['Reses Integradas'].sum() + df_zona['Reses Compradas'].sum():,.0f}",
-                                delta=None
-                            )
+                            col_a, col_b, col_c = st.columns(3)
+                            with col_a:
+                                total_integradas = df_zona['Reses Integradas'].sum()
+                                st.metric(
+                                    label="Reses Integradas",
+                                    value=f"{total_integradas:,.0f}"
+                                )
+                            with col_b:
+                                total_compradas = df_zona['Reses Compradas'].sum()
+                                st.metric(
+                                    label="Reses Compradas",
+                                    value=f"{total_compradas:,.0f}"
+                                )
+                            with col_c:
+                                st.metric(
+                                    label="Total Reses",
+                                    value=f"{total_integradas + total_compradas:,.0f}"
+                                )
                             
                             # Mostrar datos detallados
                             st.dataframe(
@@ -371,7 +400,8 @@ if uploaded_file is not None:
                                     'Ingreso Carne Int ($)': '${:,.0f}',
                                     'Ingreso Carne Comp ($)': '${:,.0f}'
                                 }),
-                                use_container_width=True
+                                use_container_width=True,
+                                height=300
                             )
                             
                             # Agrupar por semana para visualización
@@ -386,11 +416,44 @@ if uploaded_file is not None:
                             
                             # Mostrar gráfico de distribución por semana
                             st.subheader(f"Distribución Semanal - {zona_seleccionada}")
-                            chart_data = df_zona_semanal[['Semana', 'Reses Integradas', 'Reses Compradas']].set_index('Semana')
-                            st.bar_chart(chart_data)
+                            
+                            # Opción para tipo de gráfico
+                            chart_type = st.radio(
+                                "Tipo de visualización:",
+                                ["Barras", "Líneas"],
+                                horizontal=True,
+                                key=f"chart_type_{zona_seleccionada}"
+                            )
+                            
+                            if chart_type == "Barras":
+                                chart_data = df_zona_semanal[['Semana', 'Reses Integradas', 'Reses Compradas']].set_index('Semana')
+                                st.bar_chart(chart_data)
+                            else:
+                                # Usar Plotly para gráfico de líneas
+                                try:
+                                    import plotly.express as px
+                                    df_melted = pd.melt(
+                                        df_zona_semanal,
+                                        id_vars=['Semana'],
+                                        value_vars=['Reses Integradas', 'Reses Compradas'],
+                                        var_name='Tipo Res',
+                                        value_name='Cantidad'
+                                    )
+                                    fig = px.line(
+                                        df_melted,
+                                        x='Semana',
+                                        y='Cantidad',
+                                        color='Tipo Res',
+                                        title=f"Evolución Semanal - {zona_seleccionada}",
+                                        markers=True
+                                    )
+                                    st.plotly_chart(fig, use_container_width=True)
+                                except:
+                                    # Fallback a gráfico de líneas de Streamlit
+                                    st.line_chart(chart_data)
                             
                         else:
-                            st.info(f"No hay asignaciones para la zona {zona_seleccionada} en la solución óptima.")
+                            st.info(f"⚠️ No hay asignaciones para la zona {zona_seleccionada} en la solución óptima.")
                 
                 with tab2:
                     st.subheader("🚚 Análisis de Costos de Transporte por Zona")
@@ -409,8 +472,11 @@ if uploaded_file is not None:
                     
                     for t in semanas:
                         for p in plantas:
-                            viaje_int_val = contexto['variables']['viaje_int'].get((zona_transporte, p, t), 0)
-                            viaje_com_val = contexto['variables']['viaje_com'].get((zona_transporte, p, t), 0)
+                            viaje_int_var = contexto['variables']['viaje_int'].get((zona_transporte, p, t))
+                            viaje_com_var = contexto['variables']['viaje_com'].get((zona_transporte, p, t))
+                            
+                            viaje_int_val = obtener_valor_pulp(viaje_int_var)
+                            viaje_com_val = obtener_valor_pulp(viaje_com_var)
                             
                             if viaje_int_val > 0 or viaje_com_val > 0:
                                 costo_viaje_int = contexto['parametros'].get('Costo_Viaje_Int', {}).get((zona_transporte, p), 0)
@@ -419,12 +485,12 @@ if uploaded_file is not None:
                                 transporte_data.append({
                                     'Semana': t,
                                     'Planta Destino': p,
-                                    'Viajes Integrados': int(viaje_int_val.varValue) if hasattr(viaje_int_val, 'varValue') else int(viaje_int_val),
-                                    'Viajes Comprados': int(viaje_com_val.varValue) if hasattr(viaje_com_val, 'varValue') else int(viaje_com_val),
+                                    'Viajes Integrados': int(viaje_int_val),
+                                    'Viajes Comprados': int(viaje_com_val),
                                     'Costo por Viaje Int ($)': costo_viaje_int,
                                     'Costo por Viaje Comp ($)': costo_viaje_comp,
-                                    'Costo Total Int ($)': (viaje_int_val.varValue if hasattr(viaje_int_val, 'varValue') else viaje_int_val) * costo_viaje_int,
-                                    'Costo Total Comp ($)': (viaje_com_val.varValue if hasattr(viaje_com_val, 'varValue') else viaje_com_val) * costo_viaje_comp
+                                    'Costo Total Int ($)': viaje_int_val * costo_viaje_int,
+                                    'Costo Total Comp ($)': viaje_com_val * costo_viaje_comp
                                 })
                     
                     if transporte_data:
@@ -437,6 +503,7 @@ if uploaded_file is not None:
                         total_costo_comp = df_transporte['Costo Total Comp ($)'].sum()
                         
                         # Mostrar métricas
+                        st.subheader("Resumen de Transporte")
                         col1, col2, col3, col4 = st.columns(4)
                         with col1:
                             st.metric("Viajes Integrados", f"{total_viajes_int:,.0f}")
@@ -448,6 +515,7 @@ if uploaded_file is not None:
                             st.metric("Costo Transp. Comp", f"${total_costo_comp:,.0f}")
                         
                         # Mostrar tabla detallada
+                        st.subheader("Detalle por Semana y Planta")
                         st.dataframe(
                             df_transporte.style.format({
                                 'Viajes Integrados': '{:,.0f}',
@@ -457,39 +525,49 @@ if uploaded_file is not None:
                                 'Costo Total Int ($)': '${:,.0f}',
                                 'Costo Total Comp ($)': '${:,.0f}'
                             }),
-                            use_container_width=True
+                            use_container_width=True,
+                            height=300
                         )
                         
                         # Gráfico de costos de transporte por semana
                         st.subheader("Evolución Semanal de Costos de Transporte")
+                        
                         if not df_transporte.empty:
                             df_transporte_semanal = df_transporte.groupby('Semana').agg({
                                 'Costo Total Int ($)': 'sum',
                                 'Costo Total Comp ($)': 'sum'
                             }).reset_index()
                             
-                            df_transporte_semanal_melted = pd.melt(
-                                df_transporte_semanal,
-                                id_vars=['Semana'],
-                                value_vars=['Costo Total Int ($)', 'Costo Total Comp ($)'],
-                                var_name='Tipo Transporte',
-                                value_name='Costo'
-                            )
-                            
-                            import plotly.express as px
-                            fig = px.bar(
-                                df_transporte_semanal_melted,
-                                x='Semana',
-                                y='Costo',
-                                color='Tipo Transporte',
-                                title=f"Costos de Transporte por Semana - {zona_transporte}",
-                                labels={'Costo': 'Costo ($)', 'Semana': 'Semana'},
-                                barmode='group'
-                            )
-                            fig.update_layout(yaxis_tickformat=',.0f')
-                            st.plotly_chart(fig, use_container_width=True)
+                            try:
+                                import plotly.express as px
+                                df_transporte_semanal_melted = pd.melt(
+                                    df_transporte_semanal,
+                                    id_vars=['Semana'],
+                                    value_vars=['Costo Total Int ($)', 'Costo Total Comp ($)'],
+                                    var_name='Tipo Transporte',
+                                    value_name='Costo'
+                                )
+                                
+                                fig = px.bar(
+                                    df_transporte_semanal_melted,
+                                    x='Semana',
+                                    y='Costo',
+                                    color='Tipo Transporte',
+                                    title=f"Costos de Transporte por Semana - {zona_transporte}",
+                                    labels={'Costo': 'Costo ($)', 'Semana': 'Semana'},
+                                    barmode='group'
+                                )
+                                fig.update_layout(
+                                    yaxis_tickformat=',.0f',
+                                    hovermode='x unified'
+                                )
+                                st.plotly_chart(fig, use_container_width=True)
+                            except:
+                                # Fallback a gráfico de barras simple
+                                chart_data = df_transporte_semanal.set_index('Semana')
+                                st.bar_chart(chart_data)
                     else:
-                        st.info(f"No hay costos de transporte para la zona {zona_transporte} en la solución óptima.")
+                        st.info(f"⚠️ No hay costos de transporte para la zona {zona_transporte} en la solución óptima.")
                 
                 # Resumen ejecutivo por zona
                 st.subheader("📋 Resumen Ejecutivo por Zona")
@@ -506,20 +584,19 @@ if uploaded_file is not None:
                     
                     for t in semanas:
                         for p in plantas:
-                            res_int_val = contexto['variables']['res_int'].get((zona, p, t), 0)
-                            res_comp_val = contexto['variables']['res_comp'].get((zona, p, t), 0)
-                            viaje_int_val = contexto['variables']['viaje_int'].get((zona, p, t), 0)
-                            viaje_com_val = contexto['variables']['viaje_com'].get((zona, p, t), 0)
+                            # Obtener valores con manejo seguro
+                            res_int_var = contexto['variables']['res_int'].get((zona, p, t))
+                            res_comp_var = contexto['variables']['res_comp'].get((zona, p, t))
+                            viaje_int_var = contexto['variables']['viaje_int'].get((zona, p, t))
+                            viaje_com_var = contexto['variables']['viaje_com'].get((zona, p, t))
                             
-                            if hasattr(res_int_val, 'varValue'):
-                                total_reses_int += res_int_val.varValue
-                            else:
-                                total_reses_int += res_int_val
-                                
-                            if hasattr(res_comp_val, 'varValue'):
-                                total_reses_comp += res_comp_val.varValue
-                            else:
-                                total_reses_comp += res_comp_val
+                            res_int_val = obtener_valor_pulp(res_int_var)
+                            res_comp_val = obtener_valor_pulp(res_comp_var)
+                            viaje_int_val = obtener_valor_pulp(viaje_int_var)
+                            viaje_com_val = obtener_valor_pulp(viaje_com_var)
+                            
+                            total_reses_int += res_int_val
+                            total_reses_comp += res_comp_val
                             
                             # Costos
                             precio_int = contexto['parametros']['Precio_Int'].get(zona, 0)
@@ -527,10 +604,10 @@ if uploaded_file is not None:
                             costo_viaje_int = contexto['parametros'].get('Costo_Viaje_Int', {}).get((zona, p), 0)
                             costo_viaje_comp = contexto['parametros'].get('Costo_Viaje_Comp', {}).get((zona, p), 0)
                             
-                            total_costo_int += (res_int_val.varValue if hasattr(res_int_val, 'varValue') else res_int_val) * precio_int
-                            total_costo_comp += (res_comp_val.varValue if hasattr(res_comp_val, 'varValue') else res_comp_val) * precio_comp
-                            total_costo_transporte += (viaje_int_val.varValue if hasattr(viaje_int_val, 'varValue') else viaje_int_val) * costo_viaje_int
-                            total_costo_transporte += (viaje_com_val.varValue if hasattr(viaje_com_val, 'varValue') else viaje_com_val) * costo_viaje_comp
+                            total_costo_int += res_int_val * precio_int
+                            total_costo_comp += res_comp_val * precio_comp
+                            total_costo_transporte += viaje_int_val * costo_viaje_int
+                            total_costo_transporte += viaje_com_val * costo_viaje_comp
                     
                     resumen_zonas.append({
                         'Zona': zona,
@@ -672,3 +749,4 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
