@@ -282,6 +282,283 @@ if uploaded_file is not None:
             st.subheader("Desglose de Costos y Valores")
             df_costos = pd.DataFrame.from_dict(costos, orient='index', columns=['Valor ($)'])
             st.dataframe(df_costos.style.format("{:,.0f}"))
+            # ------------------------------------------------------------
+            # COMPONENTE DE ANÁLISIS POR ZONA (NUEVO)
+            # ------------------------------------------------------------
+            st.markdown("---")
+            st.subheader("📊 Análisis Detallado por Zona")
+            
+            # Seleccionador de zona
+            if 'contexto' in st.session_state:
+                zonas_disponibles = contexto['Zona']
+                
+                # Crear pestañas para diferentes análisis
+                tab1, tab2 = st.tabs(["📈 Análisis por Zona", "🚚 Análisis de Transporte"])
+                
+                with tab1:
+                    col1, col2 = st.columns([1, 3])
+                    
+                    with col1:
+                        zona_seleccionada = st.selectbox(
+                            "Seleccionar Zona para análisis:",
+                            options=zonas_disponibles,
+                            key="zona_selector"
+                        )
+                        
+                        # Calcular resumen para la zona seleccionada
+                        zona_data = []
+                        semanas = contexto['Semana']
+                        plantas = contexto['Planta_S']
+                        
+                        for t in semanas:
+                            for p in plantas:
+                                res_int_val = contexto['variables']['res_int'].get((zona_seleccionada, p, t), 0)
+                                res_comp_val = contexto['variables']['res_comp'].get((zona_seleccionada, p, t), 0)
+                                
+                                if res_int_val > 0 or res_comp_val > 0:
+                                    # Obtener valores unitarios
+                                    precio_int = contexto['parametros']['Precio_Int'].get(zona_seleccionada, 0)
+                                    precio_comp = contexto['parametros']['Precio_Comp'].get(zona_seleccionada, 0)
+                                    costo_sac = contexto['parametros']['Costo_Sac'].get(p, 0)
+                                    peso_res = contexto['parametros']['Peso_Res'].get(zona_seleccionada, 0)
+                                    rendimiento = contexto['parametros']['rdto'].get((zona_seleccionada, p), 0)
+                                    valor_kg = contexto['parametros']['valor_kg']
+                                    
+                                    # Calcular costos
+                                    costo_int_total = res_int_val * precio_int if res_int_val > 0 else 0
+                                    costo_comp_total = res_comp_val * precio_comp if res_comp_val > 0 else 0
+                                    costo_sac_int = res_int_val * costo_sac if res_int_val > 0 else 0
+                                    costo_sac_comp = res_comp_val * costo_sac if res_comp_val > 0 else 0
+                                    
+                                    # Calcular ingresos
+                                    ingreso_int = res_int_val * peso_res * rendimiento * valor_kg if res_int_val > 0 else 0
+                                    ingreso_comp = res_comp_val * peso_res * rendimiento * valor_kg if res_comp_val > 0 else 0
+                                    
+                                    zona_data.append({
+                                        'Semana': t,
+                                        'Planta': p,
+                                        'Reses Integradas': int(res_int_val.varValue) if hasattr(res_int_val, 'varValue') else int(res_int_val),
+                                        'Reses Compradas': int(res_comp_val.varValue) if hasattr(res_comp_val, 'varValue') else int(res_comp_val),
+                                        'Costo Integración ($)': round(costo_int_total, 2) if hasattr(costo_int_total, 'varValue') else round(costo_int_total, 2),
+                                        'Costo Compras ($)': round(costo_comp_total, 2) if hasattr(costo_comp_total, 'varValue') else round(costo_comp_total, 2),
+                                        'Costo Sacrificio Int ($)': round(costo_sac_int, 2) if hasattr(costo_sac_int, 'varValue') else round(costo_sac_int, 2),
+                                        'Costo Sacrificio Comp ($)': round(costo_sac_comp, 2) if hasattr(costo_sac_comp, 'varValue') else round(costo_sac_comp, 2),
+                                        'Ingreso Carne Int ($)': round(ingreso_int, 2) if hasattr(ingreso_int, 'varValue') else round(ingreso_int, 2),
+                                        'Ingreso Carne Comp ($)': round(ingreso_comp, 2) if hasattr(ingreso_comp, 'varValue') else round(ingreso_comp, 2)
+                                    })
+                    
+                    with col2:
+                        if zona_data:
+                            # Crear DataFrame
+                            df_zona = pd.DataFrame(zona_data)
+                            
+                            # Mostrar métricas resumidas
+                            st.metric(
+                                label="Total Reses en Zona",
+                                value=f"{df_zona['Reses Integradas'].sum() + df_zona['Reses Compradas'].sum():,.0f}",
+                                delta=None
+                            )
+                            
+                            # Mostrar datos detallados
+                            st.dataframe(
+                                df_zona.style.format({
+                                    'Reses Integradas': '{:,.0f}',
+                                    'Reses Compradas': '{:,.0f}',
+                                    'Costo Integración ($)': '${:,.0f}',
+                                    'Costo Compras ($)': '${:,.0f}',
+                                    'Costo Sacrificio Int ($)': '${:,.0f}',
+                                    'Costo Sacrificio Comp ($)': '${:,.0f}',
+                                    'Ingreso Carne Int ($)': '${:,.0f}',
+                                    'Ingreso Carne Comp ($)': '${:,.0f}'
+                                }),
+                                use_container_width=True
+                            )
+                            
+                            # Agrupar por semana para visualización
+                            df_zona_semanal = df_zona.groupby('Semana').agg({
+                                'Reses Integradas': 'sum',
+                                'Reses Compradas': 'sum',
+                                'Costo Integración ($)': 'sum',
+                                'Costo Compras ($)': 'sum',
+                                'Ingreso Carne Int ($)': 'sum',
+                                'Ingreso Carne Comp ($)': 'sum'
+                            }).reset_index()
+                            
+                            # Mostrar gráfico de distribución por semana
+                            st.subheader(f"Distribución Semanal - {zona_seleccionada}")
+                            chart_data = df_zona_semanal[['Semana', 'Reses Integradas', 'Reses Compradas']].set_index('Semana')
+                            st.bar_chart(chart_data)
+                            
+                        else:
+                            st.info(f"No hay asignaciones para la zona {zona_seleccionada} en la solución óptima.")
+                
+                with tab2:
+                    st.subheader("🚚 Análisis de Costos de Transporte por Zona")
+                    
+                    # Seleccionar zona para análisis de transporte
+                    zona_transporte = st.selectbox(
+                        "Seleccionar Zona para análisis de transporte:",
+                        options=zonas_disponibles,
+                        key="zona_transporte_selector"
+                    )
+                    
+                    # Calcular costos de transporte para la zona seleccionada
+                    transporte_data = []
+                    semanas = contexto['Semana']
+                    plantas = contexto['Planta_S']
+                    
+                    for t in semanas:
+                        for p in plantas:
+                            viaje_int_val = contexto['variables']['viaje_int'].get((zona_transporte, p, t), 0)
+                            viaje_com_val = contexto['variables']['viaje_com'].get((zona_transporte, p, t), 0)
+                            
+                            if viaje_int_val > 0 or viaje_com_val > 0:
+                                costo_viaje_int = contexto['parametros'].get('Costo_Viaje_Int', {}).get((zona_transporte, p), 0)
+                                costo_viaje_comp = contexto['parametros'].get('Costo_Viaje_Comp', {}).get((zona_transporte, p), 0)
+                                
+                                transporte_data.append({
+                                    'Semana': t,
+                                    'Planta Destino': p,
+                                    'Viajes Integrados': int(viaje_int_val.varValue) if hasattr(viaje_int_val, 'varValue') else int(viaje_int_val),
+                                    'Viajes Comprados': int(viaje_com_val.varValue) if hasattr(viaje_com_val, 'varValue') else int(viaje_com_val),
+                                    'Costo por Viaje Int ($)': costo_viaje_int,
+                                    'Costo por Viaje Comp ($)': costo_viaje_comp,
+                                    'Costo Total Int ($)': (viaje_int_val.varValue if hasattr(viaje_int_val, 'varValue') else viaje_int_val) * costo_viaje_int,
+                                    'Costo Total Comp ($)': (viaje_com_val.varValue if hasattr(viaje_com_val, 'varValue') else viaje_com_val) * costo_viaje_comp
+                                })
+                    
+                    if transporte_data:
+                        df_transporte = pd.DataFrame(transporte_data)
+                        
+                        # Calcular totales
+                        total_viajes_int = df_transporte['Viajes Integrados'].sum()
+                        total_viajes_comp = df_transporte['Viajes Comprados'].sum()
+                        total_costo_int = df_transporte['Costo Total Int ($)'].sum()
+                        total_costo_comp = df_transporte['Costo Total Comp ($)'].sum()
+                        
+                        # Mostrar métricas
+                        col1, col2, col3, col4 = st.columns(4)
+                        with col1:
+                            st.metric("Viajes Integrados", f"{total_viajes_int:,.0f}")
+                        with col2:
+                            st.metric("Viajes Comprados", f"{total_viajes_comp:,.0f}")
+                        with col3:
+                            st.metric("Costo Transp. Int", f"${total_costo_int:,.0f}")
+                        with col4:
+                            st.metric("Costo Transp. Comp", f"${total_costo_comp:,.0f}")
+                        
+                        # Mostrar tabla detallada
+                        st.dataframe(
+                            df_transporte.style.format({
+                                'Viajes Integrados': '{:,.0f}',
+                                'Viajes Comprados': '{:,.0f}',
+                                'Costo por Viaje Int ($)': '${:,.0f}',
+                                'Costo por Viaje Comp ($)': '${:,.0f}',
+                                'Costo Total Int ($)': '${:,.0f}',
+                                'Costo Total Comp ($)': '${:,.0f}'
+                            }),
+                            use_container_width=True
+                        )
+                        
+                        # Gráfico de costos de transporte por semana
+                        st.subheader("Evolución Semanal de Costos de Transporte")
+                        if not df_transporte.empty:
+                            df_transporte_semanal = df_transporte.groupby('Semana').agg({
+                                'Costo Total Int ($)': 'sum',
+                                'Costo Total Comp ($)': 'sum'
+                            }).reset_index()
+                            
+                            df_transporte_semanal_melted = pd.melt(
+                                df_transporte_semanal,
+                                id_vars=['Semana'],
+                                value_vars=['Costo Total Int ($)', 'Costo Total Comp ($)'],
+                                var_name='Tipo Transporte',
+                                value_name='Costo'
+                            )
+                            
+                            import plotly.express as px
+                            fig = px.bar(
+                                df_transporte_semanal_melted,
+                                x='Semana',
+                                y='Costo',
+                                color='Tipo Transporte',
+                                title=f"Costos de Transporte por Semana - {zona_transporte}",
+                                labels={'Costo': 'Costo ($)', 'Semana': 'Semana'},
+                                barmode='group'
+                            )
+                            fig.update_layout(yaxis_tickformat=',.0f')
+                            st.plotly_chart(fig, use_container_width=True)
+                    else:
+                        st.info(f"No hay costos de transporte para la zona {zona_transporte} en la solución óptima.")
+                
+                # Resumen ejecutivo por zona
+                st.subheader("📋 Resumen Ejecutivo por Zona")
+                
+                # Crear resumen para todas las zonas
+                resumen_zonas = []
+                
+                for zona in zonas_disponibles:
+                    total_reses_int = 0
+                    total_reses_comp = 0
+                    total_costo_int = 0
+                    total_costo_comp = 0
+                    total_costo_transporte = 0
+                    
+                    for t in semanas:
+                        for p in plantas:
+                            res_int_val = contexto['variables']['res_int'].get((zona, p, t), 0)
+                            res_comp_val = contexto['variables']['res_comp'].get((zona, p, t), 0)
+                            viaje_int_val = contexto['variables']['viaje_int'].get((zona, p, t), 0)
+                            viaje_com_val = contexto['variables']['viaje_com'].get((zona, p, t), 0)
+                            
+                            if hasattr(res_int_val, 'varValue'):
+                                total_reses_int += res_int_val.varValue
+                            else:
+                                total_reses_int += res_int_val
+                                
+                            if hasattr(res_comp_val, 'varValue'):
+                                total_reses_comp += res_comp_val.varValue
+                            else:
+                                total_reses_comp += res_comp_val
+                            
+                            # Costos
+                            precio_int = contexto['parametros']['Precio_Int'].get(zona, 0)
+                            precio_comp = contexto['parametros']['Precio_Comp'].get(zona, 0)
+                            costo_viaje_int = contexto['parametros'].get('Costo_Viaje_Int', {}).get((zona, p), 0)
+                            costo_viaje_comp = contexto['parametros'].get('Costo_Viaje_Comp', {}).get((zona, p), 0)
+                            
+                            total_costo_int += (res_int_val.varValue if hasattr(res_int_val, 'varValue') else res_int_val) * precio_int
+                            total_costo_comp += (res_comp_val.varValue if hasattr(res_comp_val, 'varValue') else res_comp_val) * precio_comp
+                            total_costo_transporte += (viaje_int_val.varValue if hasattr(viaje_int_val, 'varValue') else viaje_int_val) * costo_viaje_int
+                            total_costo_transporte += (viaje_com_val.varValue if hasattr(viaje_com_val, 'varValue') else viaje_com_val) * costo_viaje_comp
+                    
+                    resumen_zonas.append({
+                        'Zona': zona,
+                        'Reses Integradas': total_reses_int,
+                        'Reses Compradas': total_reses_comp,
+                        'Total Reses': total_reses_int + total_reses_comp,
+                        'Costo Integración ($)': total_costo_int,
+                        'Costo Compras ($)': total_costo_comp,
+                        'Costo Transporte ($)': total_costo_transporte,
+                        'Costo Total ($)': total_costo_int + total_costo_comp + total_costo_transporte
+                    })
+                
+                df_resumen_zonas = pd.DataFrame(resumen_zonas)
+                
+                # Mostrar resumen
+                st.dataframe(
+                    df_resumen_zonas.style.format({
+                        'Reses Integradas': '{:,.0f}',
+                        'Reses Compradas': '{:,.0f}',
+                        'Total Reses': '{:,.0f}',
+                        'Costo Integración ($)': '${:,.0f}',
+                        'Costo Compras ($)': '${:,.0f}',
+                        'Costo Transporte ($)': '${:,.0f}',
+                        'Costo Total ($)': '${:,.0f}'
+                    }).background_gradient(subset=['Total Reses', 'Costo Total ($)'], cmap='Blues'),
+                    use_container_width=True,
+                    height=400
+                )
 else:
     st.info("Por favor cargue un archivo Excel con los parámetros del modelo en el panel lateral")
 
@@ -393,4 +670,5 @@ with st.expander("Descargar plantilla de Excel"):
         data=output.getvalue(),
         file_name="plantilla_sacrificio_reses.xlsx",
         mime="application/vnd.ms-excel"
+
     )
