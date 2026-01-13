@@ -3,6 +3,7 @@ import pandas as pd
 from pulp import *
 from io import BytesIO
 import time
+import matplotlib
 
 # Configuración de la página
 st.set_page_config(page_title="Modelo de Sacrificio de Reses", layout="wide")
@@ -749,4 +750,5 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
