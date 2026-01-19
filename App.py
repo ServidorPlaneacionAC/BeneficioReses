@@ -371,6 +371,25 @@ if uploaded_file is not None:
                                         'Ingreso Comp ($)': round(ingreso_comp, 2)
                                     })
                         
+                        # DEFINIR FUNCIÓN DE ESTILOS AQUÍ (ANTES DE USARLA)
+                        def aplicar_estilos_financiera(df):
+                            """Aplica estilos condicionales a la tabla financiera."""
+                            styles = []
+                            for idx, row in df.iterrows():
+                                if 'Concepto' in df.columns:
+                                    concepto = row['Concepto']
+                                    if 'SUBTOTAL' in str(concepto):
+                                        styles.append(['font-weight: bold; background-color: #f0f0f0'] * len(row))
+                                    elif 'Costo' in str(concepto) and 'Ingreso' not in str(concepto):
+                                        styles.append(['color: #d62728'] * len(row))  # Rojo para costos
+                                    elif 'Ingreso' in str(concepto):
+                                        styles.append(['color: #2ca02c'] * len(row))  # Verde para ingresos
+                                    else:
+                                        styles.append([''] * len(row))
+                                else:
+                                    styles.append([''] * len(row))
+                            return styles
+                        
                         if zona_data:
                             df_zona = pd.DataFrame(zona_data)
                             
@@ -434,6 +453,16 @@ if uploaded_file is not None:
                                 
                                 return df_pivot
                             
+                            # Diccionario de nombres descriptivos (definirlo aquí)
+                            nombres_descriptivos = {
+                                'Costo Int ($)': 'Costo Reses Integradas',
+                                'Costo Comp ($)': 'Costo Reses Compradas',
+                                'Costo Sac Int ($)': 'Costo Sacrificio Integradas',
+                                'Costo Sac Comp ($)': 'Costo Sacrificio Compradas',
+                                'Ingreso Int ($)': 'Ingreso Carne Integradas',
+                                'Ingreso Comp ($)': 'Ingreso Carne Compradas'
+                            }
+                            
                             # Mostrar tablas separadas según vista
                             if vista_tipo == "Consolidado":
                                 # Consolidar por semana (sumar todas las plantas)
@@ -451,7 +480,7 @@ if uploaded_file is not None:
                                 # TABLA 1: UNIDADES (RESES)
                                 st.subheader(f"📊 Unidades por Semana - {zona_seleccionada}")
                                 variables_unidades = ['Reses Int', 'Reses Comp']
-                                df_unidades = crear_tabla_pivot(df_consolidado, variables_unidades, "Unidades", incluir_total=True)
+                                df_unidades = crear_tabla_pivot(df_consolidado, variables_unidades, "Unidades")
                                 
                                 # Agregar fila de TOTAL
                                 total_row = {'Variable': 'TOTAL'}
@@ -478,16 +507,6 @@ if uploaded_file is not None:
                                     'Ingreso Int ($)',
                                     'Ingreso Comp ($)'
                                 ]
-                                
-                                # Nombres más descriptivos para mostrar
-                                nombres_descriptivos = {
-                                    'Costo Int ($)': 'Costo Reses Integradas',
-                                    'Costo Comp ($)': 'Costo Reses Compradas',
-                                    'Costo Sac Int ($)': 'Costo Sacrificio Integradas',
-                                    'Costo Sac Comp ($)': 'Costo Sacrificio Compradas',
-                                    'Ingreso Int ($)': 'Ingreso Carne Integradas',
-                                    'Ingreso Comp ($)': 'Ingreso Carne Compradas'
-                                }
                                 
                                 # Crear tabla pivot
                                 pivot_data_fin = []
@@ -526,20 +545,7 @@ if uploaded_file is not None:
                                 # Crear DataFrame final
                                 df_financiera = pd.DataFrame(pivot_data_fin)
                                 
-                                # Aplicar estilos para diferenciar secciones
-                                def aplicar_estilos_financiera(df):
-                                    styles = []
-                                    for idx, row in df.iterrows():
-                                        if 'SUBTOTAL' in row['Concepto']:
-                                            styles.append(['font-weight: bold; background-color: #f0f0f0'] * len(row))
-                                        elif 'Costo' in row['Concepto'] and 'Ingreso' not in row['Concepto']:
-                                            styles.append(['color: #d62728'] * len(row))  # Rojo para costos
-                                        elif 'Ingreso' in row['Concepto']:
-                                            styles.append(['color: #2ca02c'] * len(row))  # Verde para ingresos
-                                        else:
-                                            styles.append([''] * len(row))
-                                    return styles
-                                
+                                # Mostrar tabla con estilos
                                 st.dataframe(
                                     df_financiera.style.apply(aplicar_estilos_financiera, axis=None),
                                     use_container_width=True,
@@ -582,7 +588,7 @@ if uploaded_file is not None:
                                     # TABLA 1: UNIDADES (RESES) por Planta
                                     st.subheader(f"📊 Unidades - {planta_seleccionada}")
                                     variables_unidades = ['Reses Int', 'Reses Comp']
-                                    df_unidades_planta = crear_tabla_pivot(df_planta, variables_unidades, "Unidades", incluir_total=True)
+                                    df_unidades_planta = crear_tabla_pivot(df_planta, variables_unidades, "Unidades")
                                     
                                     # Agregar fila de TOTAL
                                     total_row_planta = {'Variable': 'TOTAL'}
@@ -645,6 +651,7 @@ if uploaded_file is not None:
                                     # Crear DataFrame final
                                     df_financiera_planta = pd.DataFrame(pivot_data_fin_planta)
                                     
+                                    # Mostrar tabla con estilos
                                     st.dataframe(
                                         df_financiera_planta.style.apply(aplicar_estilos_financiera, axis=None),
                                         use_container_width=True,
@@ -974,6 +981,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
