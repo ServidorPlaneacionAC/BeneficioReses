@@ -358,10 +358,6 @@ if uploaded_file is not None:
                                     ingreso_int = res_int_val * peso_res * rendimiento * valor_kg
                                     ingreso_comp = res_comp_val * peso_res * rendimiento * valor_kg
                                     
-                                    # Margen bruto
-                                    margen_int = ingreso_int - (costo_int_total + costo_sac_int)
-                                    margen_comp = ingreso_comp - (costo_comp_total + costo_sac_comp)
-                                    
                                     zona_data.append({
                                         'Semana': t,
                                         'Planta': p,
@@ -372,10 +368,7 @@ if uploaded_file is not None:
                                         'Costo Sac Int ($)': round(costo_sac_int, 2),
                                         'Costo Sac Comp ($)': round(costo_sac_comp, 2),
                                         'Ingreso Int ($)': round(ingreso_int, 2),
-                                        'Ingreso Comp ($)': round(ingreso_comp, 2),
-                                        'Margen Int ($)': round(margen_int, 2),
-                                        'Margen Comp ($)': round(margen_comp, 2),
-                                        'Margen Total ($)': round(margen_int + margen_comp, 2)
+                                        'Ingreso Comp ($)': round(ingreso_comp, 2)
                                     })
                         
                         if zona_data:
@@ -400,22 +393,21 @@ if uploaded_file is not None:
                                 )
                             
                             with col_c:
-                                total_costo = df_zona['Costo Int ($)'].sum() + df_zona['Costo Comp ($)'].sum()
+                                total_costo_reses = df_zona['Costo Int ($)'].sum() + df_zona['Costo Comp ($)'].sum()
                                 st.metric(
                                     label="Costo Total Reses",
-                                    value=f"${total_costo:,.0f}"
+                                    value=f"${total_costo_reses:,.0f}"
                                 )
                             
                             with col_d:
-                                total_margen = df_zona['Margen Total ($)'].sum()
+                                total_ingreso = df_zona['Ingreso Int ($)'].sum() + df_zona['Ingreso Comp ($)'].sum()
                                 st.metric(
-                                    label="Margen Total",
-                                    value=f"${total_margen:,.0f}",
-                                    delta=f"{total_margen/total_costo*100:.1f}%" if total_costo > 0 else "0%"
+                                    label="Ingreso Total",
+                                    value=f"${total_ingreso:,.0f}"
                                 )
                             
                             # FUNCIÓN AUXILIAR PARA CREAR TABLAS PIVOTE
-                            def crear_tabla_pivot(df, variables, titulo, incluir_total=True):
+                            def crear_tabla_pivot(df, variables, titulo, incluir_total=False, es_monetaria=False):
                                 """Crea una tabla pivot con semanas como columnas y variables como filas."""
                                 pivot_data = []
                                 
@@ -424,39 +416,19 @@ if uploaded_file is not None:
                                     for semana in sorted(df['Semana'].unique()):
                                         # Obtener valor para esta semana
                                         valor = df[df['Semana'] == semana][var].sum()
-                                        
-                                        # Formatear según tipo de variable
-                                        if 'Costo' in var or 'Ingreso' in var or 'Margen' in var:
-                                            row[semana] = valor  # Guardar valor numérico para formato posterior
-                                        else:
-                                            row[semana] = valor
-                                    
+                                        row[semana] = valor
                                     pivot_data.append(row)
-                                
-                                # Agregar fila de TOTAL si se solicita
-                                if incluir_total and any('Reses' in var for var in variables):
-                                    total_row = {'Variable': 'TOTAL'}
-                                    for semana in sorted(df['Semana'].unique()):
-                                        # Sumar todas las variables de reses
-                                        total_valor = 0
-                                        for var in variables:
-                                            if 'Reses' in var:
-                                                total_valor += df[df['Semana'] == semana][var].sum()
-                                        total_row[semana] = total_valor
-                                    pivot_data.append(total_row)
                                 
                                 df_pivot = pd.DataFrame(pivot_data)
                                 
-                                # Aplicar formato
+                                # Formatear valores
                                 for col in df_pivot.columns:
                                     if col != 'Variable':
                                         for idx, row in df_pivot.iterrows():
                                             valor = row[col]
                                             if isinstance(valor, (int, float)):
-                                                if 'Costo' in row['Variable'] or 'Ingreso' in row['Variable'] or 'Margen' in row['Variable']:
+                                                if es_monetaria:
                                                     df_pivot.at[idx, col] = f"${valor:,.0f}"
-                                                elif row['Variable'] == 'TOTAL':
-                                                    df_pivot.at[idx, col] = f"{valor:,.0f}"
                                                 else:
                                                     df_pivot.at[idx, col] = f"{int(valor):,}"
                                 
@@ -473,86 +445,105 @@ if uploaded_file is not None:
                                     'Costo Sac Int ($)': 'sum',
                                     'Costo Sac Comp ($)': 'sum',
                                     'Ingreso Int ($)': 'sum',
-                                    'Ingreso Comp ($)': 'sum',
-                                    'Margen Int ($)': 'sum',
-                                    'Margen Comp ($)': 'sum',
-                                    'Margen Total ($)': 'sum'
+                                    'Ingreso Comp ($)': 'sum'
                                 }).reset_index()
                                 
                                 # TABLA 1: UNIDADES (RESES)
                                 st.subheader(f"📊 Unidades por Semana - {zona_seleccionada}")
                                 variables_unidades = ['Reses Int', 'Reses Comp']
-                                df_unidades = crear_tabla_pivot(df_consolidado, variables_unidades, "Unidades")
-                                st.dataframe(
-                                    df_unidades,
-                                    use_container_width=True,
-                                    height=200
-                                )
+                                df_unidades = crear_tabla_pivot(df_consolidado, variables_unidades, "Unidades", incluir_total=True)
                                 
-                                # TABLA 2: COSTOS Y GASTOS
-                                st.subheader(f"💰 Costos por Semana - {zona_seleccionada}")
-                                variables_costos = [
-                                    'Costo Int ($)', 
-                                    'Costo Comp ($)',
-                                    'Costo Sac Int ($)', 
-                                    'Costo Sac Comp ($)'
-                                ]
-                                df_costos = crear_tabla_pivot(df_consolidado, variables_costos, "Costos", incluir_total=False)
-                                
-                                # Agregar fila de subtotal de costos
-                                subtotal_row = {'Variable': 'Subtotal Costos'}
+                                # Agregar fila de TOTAL
+                                total_row = {'Variable': 'TOTAL'}
                                 for semana in sorted(df_consolidado['Semana'].unique()):
-                                    subtotal = sum(df_consolidado[df_consolidado['Semana'] == semana][var].sum() for var in variables_costos)
-                                    subtotal_row[semana] = f"${subtotal:,.0f}"
+                                    total_valor = df_consolidado[df_consolidado['Semana'] == semana]['Reses Int'].sum() + \
+                                                df_consolidado[df_consolidado['Semana'] == semana]['Reses Comp'].sum()
+                                    total_row[semana] = f"{int(total_valor):,}"
                                 
-                                # Convertir a DataFrame temporal para agregar la fila
-                                temp_df = df_costos.copy()
-                                subtotal_df = pd.DataFrame([subtotal_row])
-                                df_costos = pd.concat([temp_df, subtotal_df], ignore_index=True)
+                                df_unidades = pd.concat([df_unidades, pd.DataFrame([total_row])], ignore_index=True)
+                                st.dataframe(df_unidades, use_container_width=True, height=200)
                                 
-                                st.dataframe(
-                                    df_costos,
-                                    use_container_width=True,
-                                    height=250
-                                )
+                                # TABLA 2: COSTOS E INGRESOS (COMBINADA)
+                                st.subheader(f"💰 Costos e Ingresos por Semana - {zona_seleccionada}")
                                 
-                                # TABLA 3: INGRESOS Y MÁRGENES
-                                st.subheader(f"📈 Ingresos y Márgenes por Semana - {zona_seleccionada}")
-                                variables_ingresos = [
-                                    'Ingreso Int ($)', 
-                                    'Ingreso Comp ($)',
-                                    'Margen Int ($)', 
-                                    'Margen Comp ($)',
-                                    'Margen Total ($)'
+                                # Definir variables de costos e ingresos
+                                variables_financieras = [
+                                    # Costos de reses
+                                    'Costo Int ($)',
+                                    'Costo Comp ($)',
+                                    # Costos de sacrificio
+                                    'Costo Sac Int ($)',
+                                    'Costo Sac Comp ($)',
+                                    # Ingresos
+                                    'Ingreso Int ($)',
+                                    'Ingreso Comp ($)'
                                 ]
-                                df_ingresos = crear_tabla_pivot(df_consolidado, variables_ingresos, "Ingresos", incluir_total=False)
                                 
-                                # Agregar fila de subtotal de ingresos
-                                subtotal_ing_row = {'Variable': 'Subtotal Ingresos'}
+                                # Nombres más descriptivos para mostrar
+                                nombres_descriptivos = {
+                                    'Costo Int ($)': 'Costo Reses Integradas',
+                                    'Costo Comp ($)': 'Costo Reses Compradas',
+                                    'Costo Sac Int ($)': 'Costo Sacrificio Integradas',
+                                    'Costo Sac Comp ($)': 'Costo Sacrificio Compradas',
+                                    'Ingreso Int ($)': 'Ingreso Carne Integradas',
+                                    'Ingreso Comp ($)': 'Ingreso Carne Compradas'
+                                }
+                                
+                                # Crear tabla pivot
+                                pivot_data_fin = []
+                                for var in variables_financieras:
+                                    row = {'Concepto': nombres_descriptivos[var]}
+                                    for semana in sorted(df_consolidado['Semana'].unique()):
+                                        valor = df_consolidado[df_consolidado['Semana'] == semana][var].sum()
+                                        row[semana] = f"${valor:,.0f}"
+                                    pivot_data_fin.append(row)
+                                
+                                # Agregar subtotales
+                                # Subtotal Costos de Reses
+                                subtotal_costos_res_row = {'Concepto': 'SUBTOTAL: Costos de Reses'}
+                                for semana in sorted(df_consolidado['Semana'].unique()):
+                                    subtotal = df_consolidado[df_consolidado['Semana'] == semana]['Costo Int ($)'].sum() + \
+                                             df_consolidado[df_consolidado['Semana'] == semana]['Costo Comp ($)'].sum()
+                                    subtotal_costos_res_row[semana] = f"${subtotal:,.0f}"
+                                pivot_data_fin.append(subtotal_costos_res_row)
+                                
+                                # Subtotal Costos de Sacrificio
+                                subtotal_costos_sac_row = {'Concepto': 'SUBTOTAL: Costos de Sacrificio'}
+                                for semana in sorted(df_consolidado['Semana'].unique()):
+                                    subtotal = df_consolidado[df_consolidado['Semana'] == semana]['Costo Sac Int ($)'].sum() + \
+                                             df_consolidado[df_consolidado['Semana'] == semana]['Costo Sac Comp ($)'].sum()
+                                    subtotal_costos_sac_row[semana] = f"${subtotal:,.0f}"
+                                pivot_data_fin.append(subtotal_costos_sac_row)
+                                
+                                # Subtotal Ingresos
+                                subtotal_ingresos_row = {'Concepto': 'SUBTOTAL: Ingresos por Carne'}
                                 for semana in sorted(df_consolidado['Semana'].unique()):
                                     subtotal = df_consolidado[df_consolidado['Semana'] == semana]['Ingreso Int ($)'].sum() + \
-                                              df_consolidado[df_consolidado['Semana'] == semana]['Ingreso Comp ($)'].sum()
-                                    subtotal_ing_row[semana] = f"${subtotal:,.0f}"
+                                             df_consolidado[df_consolidado['Semana'] == semana]['Ingreso Comp ($)'].sum()
+                                    subtotal_ingresos_row[semana] = f"${subtotal:,.0f}"
+                                pivot_data_fin.append(subtotal_ingresos_row)
                                 
-                                # Agregar fila de utilidad neta
-                                utilidad_row = {'Variable': 'Utilidad Neta (%)'}
-                                for semana in sorted(df_consolidado['Semana'].unique()):
-                                    ingresos_total = df_consolidado[df_consolidado['Semana'] == semana]['Ingreso Int ($)'].sum() + \
-                                                   df_consolidado[df_consolidado['Semana'] == semana]['Ingreso Comp ($)'].sum()
-                                    costos_total = sum(df_consolidado[df_consolidado['Semana'] == semana][var].sum() for var in variables_costos)
-                                    utilidad_pct = (ingresos_total - costos_total) / ingresos_total * 100 if ingresos_total > 0 else 0
-                                    utilidad_row[semana] = f"{utilidad_pct:.1f}%"
+                                # Crear DataFrame final
+                                df_financiera = pd.DataFrame(pivot_data_fin)
                                 
-                                # Combinar todas las filas
-                                temp_ing_df = df_ingresos.copy()
-                                subtotal_ing_df = pd.DataFrame([subtotal_ing_row])
-                                utilidad_df = pd.DataFrame([utilidad_row])
-                                df_ingresos = pd.concat([temp_ing_df, subtotal_ing_df, utilidad_df], ignore_index=True)
+                                # Aplicar estilos para diferenciar secciones
+                                def aplicar_estilos_financiera(df):
+                                    styles = []
+                                    for idx, row in df.iterrows():
+                                        if 'SUBTOTAL' in row['Concepto']:
+                                            styles.append(['font-weight: bold; background-color: #f0f0f0'] * len(row))
+                                        elif 'Costo' in row['Concepto'] and 'Ingreso' not in row['Concepto']:
+                                            styles.append(['color: #d62728'] * len(row))  # Rojo para costos
+                                        elif 'Ingreso' in row['Concepto']:
+                                            styles.append(['color: #2ca02c'] * len(row))  # Verde para ingresos
+                                        else:
+                                            styles.append([''] * len(row))
+                                    return styles
                                 
                                 st.dataframe(
-                                    df_ingresos,
+                                    df_financiera.style.apply(aplicar_estilos_financiera, axis=None),
                                     use_container_width=True,
-                                    height=300
+                                    height=400
                                 )
                                 
                             else:  # Vista por Planta
@@ -577,101 +568,87 @@ if uploaded_file is not None:
                                         st.metric("Total Reses", f"{total_reses:,.0f}")
                                     
                                     with col2:
-                                        costo_total = df_planta['Costo Int ($)'].sum() + df_planta['Costo Comp ($)'].sum() + \
-                                                     df_planta['Costo Sac Int ($)'].sum() + df_planta['Costo Sac Comp ($)'].sum()
-                                        st.metric("Costo Total", f"${costo_total:,.0f}")
+                                        costo_reses = df_planta['Costo Int ($)'].sum() + df_planta['Costo Comp ($)'].sum()
+                                        st.metric("Costo Reses", f"${costo_reses:,.0f}")
                                     
                                     with col3:
-                                        ingreso_total = df_planta['Ingreso Int ($)'].sum() + df_planta['Ingreso Comp ($)'].sum()
-                                        st.metric("Ingreso Total", f"${ingreso_total:,.0f}")
+                                        costos_sac = df_planta['Costo Sac Int ($)'].sum() + df_planta['Costo Sac Comp ($)'].sum()
+                                        st.metric("Costo Sacrificio", f"${costos_sac:,.0f}")
                                     
                                     with col4:
-                                        margen_total = df_planta['Margen Total ($)'].sum()
-                                        margen_pct = (margen_total / ingreso_total * 100) if ingreso_total > 0 else 0
-                                        st.metric("Margen", f"${margen_total:,.0f}", delta=f"{margen_pct:.1f}%")
+                                        ingresos_total = df_planta['Ingreso Int ($)'].sum() + df_planta['Ingreso Comp ($)'].sum()
+                                        st.metric("Ingreso Total", f"${ingresos_total:,.0f}")
                                     
                                     # TABLA 1: UNIDADES (RESES) por Planta
                                     st.subheader(f"📊 Unidades - {planta_seleccionada}")
                                     variables_unidades = ['Reses Int', 'Reses Comp']
-                                    df_unidades_planta = crear_tabla_pivot(df_planta, variables_unidades, "Unidades")
-                                    st.dataframe(
-                                        df_unidades_planta,
-                                        use_container_width=True,
-                                        height=200
-                                    )
+                                    df_unidades_planta = crear_tabla_pivot(df_planta, variables_unidades, "Unidades", incluir_total=True)
                                     
-                                    # TABLA 2: COSTOS por Planta
-                                    st.subheader(f"💰 Costos - {planta_seleccionada}")
-                                    variables_costos_planta = [
-                                        'Costo Int ($)', 
+                                    # Agregar fila de TOTAL
+                                    total_row_planta = {'Variable': 'TOTAL'}
+                                    for semana in sorted(df_planta['Semana'].unique()):
+                                        total_valor = df_planta[df_planta['Semana'] == semana]['Reses Int'].sum() + \
+                                                    df_planta[df_planta['Semana'] == semana]['Reses Comp'].sum()
+                                        total_row_planta[semana] = f"{int(total_valor):,}"
+                                    
+                                    df_unidades_planta = pd.concat([df_unidades_planta, pd.DataFrame([total_row_planta])], ignore_index=True)
+                                    st.dataframe(df_unidades_planta, use_container_width=True, height=200)
+                                    
+                                    # TABLA 2: COSTOS E INGRESOS por Planta
+                                    st.subheader(f"💰 Costos e Ingresos - {planta_seleccionada}")
+                                    
+                                    # Variables financieras para planta específica
+                                    variables_financieras_planta = [
+                                        'Costo Int ($)',
                                         'Costo Comp ($)',
-                                        'Costo Sac Int ($)', 
-                                        'Costo Sac Comp ($)'
+                                        'Costo Sac Int ($)',
+                                        'Costo Sac Comp ($)',
+                                        'Ingreso Int ($)',
+                                        'Ingreso Comp ($)'
                                     ]
-                                    df_costos_planta = crear_tabla_pivot(df_planta, variables_costos_planta, "Costos", incluir_total=False)
                                     
-                                    # Agregar subtotal
-                                    subtotal_row = {'Variable': 'Subtotal Costos'}
+                                    # Crear tabla pivot para planta
+                                    pivot_data_fin_planta = []
+                                    for var in variables_financieras_planta:
+                                        nombre = nombres_descriptivos.get(var, var)
+                                        row = {'Concepto': nombre}
+                                        for semana in sorted(df_planta['Semana'].unique()):
+                                            valor = df_planta[df_planta['Semana'] == semana][var].sum()
+                                            row[semana] = f"${valor:,.0f}"
+                                        pivot_data_fin_planta.append(row)
+                                    
+                                    # Agregar subtotales para planta
+                                    # Subtotal Costos de Reses
+                                    subtotal_costos_res_planta = {'Concepto': 'SUBTOTAL: Costos de Reses'}
                                     for semana in sorted(df_planta['Semana'].unique()):
-                                        subtotal = sum(df_planta[df_planta['Semana'] == semana][var].sum() for var in variables_costos_planta)
-                                        subtotal_row[semana] = f"${subtotal:,.0f}"
+                                        subtotal = df_planta[df_planta['Semana'] == semana]['Costo Int ($)'].sum() + \
+                                                 df_planta[df_planta['Semana'] == semana]['Costo Comp ($)'].sum()
+                                        subtotal_costos_res_planta[semana] = f"${subtotal:,.0f}"
+                                    pivot_data_fin_planta.append(subtotal_costos_res_planta)
                                     
-                                    temp_costos = df_costos_planta.copy()
-                                    subtotal_df = pd.DataFrame([subtotal_row])
-                                    df_costos_planta = pd.concat([temp_costos, subtotal_df], ignore_index=True)
+                                    # Subtotal Costos de Sacrificio
+                                    subtotal_costos_sac_planta = {'Concepto': 'SUBTOTAL: Costos de Sacrificio'}
+                                    for semana in sorted(df_planta['Semana'].unique()):
+                                        subtotal = df_planta[df_planta['Semana'] == semana]['Costo Sac Int ($)'].sum() + \
+                                                 df_planta[df_planta['Semana'] == semana]['Costo Sac Comp ($)'].sum()
+                                        subtotal_costos_sac_planta[semana] = f"${subtotal:,.0f}"
+                                    pivot_data_fin_planta.append(subtotal_costos_sac_planta)
+                                    
+                                    # Subtotal Ingresos
+                                    subtotal_ingresos_planta = {'Concepto': 'SUBTOTAL: Ingresos por Carne'}
+                                    for semana in sorted(df_planta['Semana'].unique()):
+                                        subtotal = df_planta[df_planta['Semana'] == semana]['Ingreso Int ($)'].sum() + \
+                                                 df_planta[df_planta['Semana'] == semana]['Ingreso Comp ($)'].sum()
+                                        subtotal_ingresos_planta[semana] = f"${subtotal:,.0f}"
+                                    pivot_data_fin_planta.append(subtotal_ingresos_planta)
+                                    
+                                    # Crear DataFrame final
+                                    df_financiera_planta = pd.DataFrame(pivot_data_fin_planta)
                                     
                                     st.dataframe(
-                                        df_costos_planta,
+                                        df_financiera_planta.style.apply(aplicar_estilos_financiera, axis=None),
                                         use_container_width=True,
-                                        height=250
-                                    )
-                                    
-                                    # TABLA 3: INGRESOS Y MÁRGENES por Planta
-                                    st.subheader(f"📈 Ingresos y Márgenes - {planta_seleccionada}")
-                                    variables_ingresos_planta = [
-                                        'Ingreso Int ($)', 
-                                        'Ingreso Comp ($)',
-                                        'Margen Int ($)', 
-                                        'Margen Comp ($)',
-                                        'Margen Total ($)'
-                                    ]
-                                    df_ingresos_planta = crear_tabla_pivot(df_planta, variables_ingresos_planta, "Ingresos", incluir_total=False)
-                                    
-                                    # Agregar métricas adicionales
-                                    subtotal_ing_row = {'Variable': 'Subtotal Ingresos'}
-                                    costo_unitario_row = {'Variable': 'Costo/Res ($)'}
-                                    ingreso_unitario_row = {'Variable': 'Ingreso/Res ($)'}
-                                    
-                                    for semana in sorted(df_planta['Semana'].unique()):
-                                        # Subtotal ingresos
-                                        subtotal_ing = df_planta[df_planta['Semana'] == semana]['Ingreso Int ($)'].sum() + \
-                                                     df_planta[df_planta['Semana'] == semana]['Ingreso Comp ($)'].sum()
-                                        subtotal_ing_row[semana] = f"${subtotal_ing:,.0f}"
-                                        
-                                        # Costo por res
-                                        total_reses_semana = df_planta[df_planta['Semana'] == semana]['Reses Int'].sum() + \
-                                                           df_planta[df_planta['Semana'] == semana]['Reses Comp'].sum()
-                                        costo_total_semana = sum(df_planta[df_planta['Semana'] == semana][var].sum() for var in variables_costos_planta)
-                                        costo_unitario = costo_total_semana / total_reses_semana if total_reses_semana > 0 else 0
-                                        costo_unitario_row[semana] = f"${costo_unitario:,.0f}"
-                                        
-                                        # Ingreso por res
-                                        ingreso_unitario = subtotal_ing / total_reses_semana if total_reses_semana > 0 else 0
-                                        ingreso_unitario_row[semana] = f"${ingreso_unitario:,.0f}"
-                                    
-                                    # Combinar todas las filas
-                                    temp_ing_planta = df_ingresos_planta.copy()
-                                    df_ingresos_planta = pd.concat([
-                                        temp_ing_planta,
-                                        pd.DataFrame([subtotal_ing_row]),
-                                        pd.DataFrame([costo_unitario_row]),
-                                        pd.DataFrame([ingreso_unitario_row])
-                                    ], ignore_index=True)
-                                    
-                                    st.dataframe(
-                                        df_ingresos_planta,
-                                        use_container_width=True,
-                                        height=350
+                                        height=400
                                     )
                                     
                                 else:
@@ -680,35 +657,25 @@ if uploaded_file is not None:
                             # Gráficos resumen
                             st.subheader(f"📈 Visualización - {zona_seleccionada}")
                             
-                            # Crear pestañas para diferentes gráficos
-                            chart_tab1, chart_tab2 = st.tabs(["Unidades", "Valores"])
-                            
-                            with chart_tab1:
-                                if vista_tipo == "Consolidado":
-                                    chart_data = df_consolidado[['Semana', 'Reses Int', 'Reses Comp']].set_index('Semana')
-                                else:
-                                    if not df_planta.empty:
-                                        chart_data = df_planta[['Semana', 'Reses Int', 'Reses Comp']].set_index('Semana')
-                                    else:
-                                        chart_data = pd.DataFrame()
+                            if vista_tipo == "Consolidado":
+                                # Gráfico de unidades
+                                chart_data_unidades = df_consolidado[['Semana', 'Reses Int', 'Reses Comp']].set_index('Semana')
+                                st.bar_chart(chart_data_unidades)
                                 
-                                if not chart_data.empty:
-                                    st.bar_chart(chart_data)
-                            
-                            with chart_tab2:
-                                if vista_tipo == "Consolidado":
-                                    # Gráfico de costos vs ingresos
-                                    chart_data_val = df_consolidado[['Semana', 'Costo Int ($)', 'Costo Comp ($)', 
-                                                                    'Ingreso Int ($)', 'Ingreso Comp ($)']].set_index('Semana')
-                                else:
-                                    if not df_planta.empty:
-                                        chart_data_val = df_planta[['Semana', 'Costo Int ($)', 'Costo Comp ($)', 
-                                                                   'Ingreso Int ($)', 'Ingreso Comp ($)']].set_index('Semana')
-                                    else:
-                                        chart_data_val = pd.DataFrame()
+                                # Gráfico de costos vs ingresos
+                                chart_data_fin = df_consolidado[['Semana', 'Costo Int ($)', 'Costo Comp ($)', 
+                                                                'Ingreso Int ($)', 'Ingreso Comp ($)']].set_index('Semana')
+                                st.area_chart(chart_data_fin)
                                 
-                                if not chart_data_val.empty:
-                                    st.area_chart(chart_data_val)
+                            elif vista_tipo == "Por Planta" and not df_planta.empty:
+                                # Gráfico de unidades por planta
+                                chart_data_unidades_planta = df_planta[['Semana', 'Reses Int', 'Reses Comp']].set_index('Semana')
+                                st.bar_chart(chart_data_unidades_planta)
+                                
+                                # Gráfico de costos vs ingresos por planta
+                                chart_data_fin_planta = df_planta[['Semana', 'Costo Int ($)', 'Costo Comp ($)', 
+                                                                  'Ingreso Int ($)', 'Ingreso Comp ($)']].set_index('Semana')
+                                st.area_chart(chart_data_fin_planta)
                         
                         else:
                             st.info(f"⚠️ No hay asignaciones para la zona {zona_seleccionada} en la solución óptima.")
@@ -1007,6 +974,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
