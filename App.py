@@ -317,6 +317,14 @@ if uploaded_file is not None:
                             key="zona_selector"
                         )
                         
+                        # Opción para ver datos por planta o consolidado
+                        vista_tipo = st.radio(
+                            "Tipo de vista:",
+                            ["Consolidado", "Por Planta"],
+                            key=f"vista_{zona_seleccionada}"
+                        )
+                    
+                    with col2:
                         # Calcular resumen para la zona seleccionada
                         zona_data = []
                         semanas = contexto['Semana']
@@ -331,7 +339,6 @@ if uploaded_file is not None:
                                 res_int_val = obtener_valor_pulp(res_int_var)
                                 res_comp_val = obtener_valor_pulp(res_comp_var)
                                 
-                                # CORRECCIÓN: Verificar si hay valores positivos
                                 if res_int_val > 0 or res_comp_val > 0:
                                     # Obtener valores unitarios
                                     precio_int = contexto['parametros']['Precio_Int'].get(zona_seleccionada, 0)
@@ -351,108 +358,231 @@ if uploaded_file is not None:
                                     ingreso_int = res_int_val * peso_res * rendimiento * valor_kg
                                     ingreso_comp = res_comp_val * peso_res * rendimiento * valor_kg
                                     
+                                    # Margen bruto
+                                    margen_int = ingreso_int - (costo_int_total + costo_sac_int)
+                                    margen_comp = ingreso_comp - (costo_comp_total + costo_sac_comp)
+                                    
                                     zona_data.append({
                                         'Semana': t,
                                         'Planta': p,
-                                        'Reses Integradas': int(res_int_val),
-                                        'Reses Compradas': int(res_comp_val),
-                                        'Costo Integración ($)': round(costo_int_total, 2),
-                                        'Costo Compras ($)': round(costo_comp_total, 2),
-                                        'Costo Sacrificio Int ($)': round(costo_sac_int, 2),
-                                        'Costo Sacrificio Comp ($)': round(costo_sac_comp, 2),
-                                        'Ingreso Carne Int ($)': round(ingreso_int, 2),
-                                        'Ingreso Carne Comp ($)': round(ingreso_comp, 2)
+                                        'Reses Int': int(res_int_val),
+                                        'Reses Comp': int(res_comp_val),
+                                        'Costo Int ($)': round(costo_int_total, 2),
+                                        'Costo Comp ($)': round(costo_comp_total, 2),
+                                        'Costo Sac Int ($)': round(costo_sac_int, 2),
+                                        'Costo Sac Comp ($)': round(costo_sac_comp, 2),
+                                        'Ingreso Int ($)': round(ingreso_int, 2),
+                                        'Ingreso Comp ($)': round(ingreso_comp, 2),
+                                        'Margen Int ($)': round(margen_int, 2),
+                                        'Margen Comp ($)': round(margen_comp, 2),
+                                        'Margen Total ($)': round(margen_int + margen_comp, 2)
                                     })
-                    
-                    with col2:
+                        
                         if zona_data:
-                            # Crear DataFrame
                             df_zona = pd.DataFrame(zona_data)
                             
                             # Mostrar métricas resumidas
-                            col_a, col_b, col_c = st.columns(3)
+                            st.subheader(f"Resumen - {zona_seleccionada}")
+                            col_a, col_b, col_c, col_d = st.columns(4)
+                            
                             with col_a:
-                                total_integradas = df_zona['Reses Integradas'].sum()
+                                total_integradas = df_zona['Reses Int'].sum()
                                 st.metric(
                                     label="Reses Integradas",
                                     value=f"{total_integradas:,.0f}"
                                 )
+                            
                             with col_b:
-                                total_compradas = df_zona['Reses Compradas'].sum()
+                                total_compradas = df_zona['Reses Comp'].sum()
                                 st.metric(
                                     label="Reses Compradas",
                                     value=f"{total_compradas:,.0f}"
                                 )
+                            
                             with col_c:
+                                total_costo = df_zona['Costo Int ($)'].sum() + df_zona['Costo Comp ($)'].sum()
                                 st.metric(
-                                    label="Total Reses",
-                                    value=f"{total_integradas + total_compradas:,.0f}"
+                                    label="Costo Total Reses",
+                                    value=f"${total_costo:,.0f}"
                                 )
                             
-                            # Mostrar datos detallados
-                            st.dataframe(
-                                df_zona.style.format({
-                                    'Reses Integradas': '{:,.0f}',
-                                    'Reses Compradas': '{:,.0f}',
-                                    'Costo Integración ($)': '${:,.0f}',
-                                    'Costo Compras ($)': '${:,.0f}',
-                                    'Costo Sacrificio Int ($)': '${:,.0f}',
-                                    'Costo Sacrificio Comp ($)': '${:,.0f}',
-                                    'Ingreso Carne Int ($)': '${:,.0f}',
-                                    'Ingreso Carne Comp ($)': '${:,.0f}'
-                                }),
-                                use_container_width=True,
-                                height=300
-                            )
+                            with col_d:
+                                total_margen = df_zona['Margen Total ($)'].sum()
+                                st.metric(
+                                    label="Margen Total",
+                                    value=f"${total_margen:,.0f}",
+                                    delta=f"{total_margen/total_costo*100:.1f}%" if total_costo > 0 else "0%"
+                                )
                             
-                            # Agrupar por semana para visualización
-                            df_zona_semanal = df_zona.groupby('Semana').agg({
-                                'Reses Integradas': 'sum',
-                                'Reses Compradas': 'sum',
-                                'Costo Integración ($)': 'sum',
-                                'Costo Compras ($)': 'sum',
-                                'Ingreso Carne Int ($)': 'sum',
-                                'Ingreso Carne Comp ($)': 'sum'
-                            }).reset_index()
+                            # Mostrar vista pivotada según selección
+                            if vista_tipo == "Consolidado":
+                                # Consolidar por semana (sumar todas las plantas)
+                                df_consolidado = df_zona.groupby('Semana').agg({
+                                    'Reses Int': 'sum',
+                                    'Reses Comp': 'sum',
+                                    'Costo Int ($)': 'sum',
+                                    'Costo Comp ($)': 'sum',
+                                    'Costo Sac Int ($)': 'sum',
+                                    'Costo Sac Comp ($)': 'sum',
+                                    'Ingreso Int ($)': 'sum',
+                                    'Ingreso Comp ($)': 'sum',
+                                    'Margen Int ($)': 'sum',
+                                    'Margen Comp ($)': 'sum',
+                                    'Margen Total ($)': 'sum'
+                                }).reset_index()
+                                
+                                # Transponer: semanas como columnas, variables como filas
+                                variables = [
+                                    'Reses Int', 'Reses Comp', 
+                                    'Costo Int ($)', 'Costo Comp ($)',
+                                    'Costo Sac Int ($)', 'Costo Sac Comp ($)',
+                                    'Ingreso Int ($)', 'Ingreso Comp ($)',
+                                    'Margen Int ($)', 'Margen Comp ($)',
+                                    'Margen Total ($)'
+                                ]
+                                
+                                # Crear DataFrame transpuesto
+                                pivot_data = []
+                                for var in variables:
+                                    row = {'Variable': var}
+                                    for semana in df_consolidado['Semana']:
+                                        valor = df_consolidado[df_consolidado['Semana'] == semana][var].values[0]
+                                        # Formatear según tipo de variable
+                                        if 'Costo' in var or 'Ingreso' in var or 'Margen' in var:
+                                            row[semana] = f"${valor:,.0f}"
+                                        else:
+                                            row[semana] = f"{valor:,.0f}"
+                                    pivot_data.append(row)
+                                
+                                df_pivot = pd.DataFrame(pivot_data)
+                                
+                                # Agregar fila de TOTAL
+                                total_row = {'Variable': 'TOTAL'}
+                                for semana in df_consolidado['Semana']:
+                                    # Sumar reses
+                                    total_reses = df_consolidado[df_consolidado['Semana'] == semana][['Reses Int', 'Reses Comp']].sum().sum()
+                                    total_row[semana] = f"{total_reses:,.0f}"
+                                pivot_data.append(total_row)
+                                
+                                df_pivot = pd.DataFrame(pivot_data)
+                                
+                                # Mostrar tabla pivotada
+                                st.subheader(f"Consolidado por Semana - {zona_seleccionada}")
+                                st.dataframe(
+                                    df_pivot,
+                                    use_container_width=True,
+                                    height=500
+                                )
+                                
+                            else:  # Vista por Planta
+                                # Mostrar selector de planta
+                                plantas_disponibles = df_zona['Planta'].unique()
+                                planta_seleccionada = st.selectbox(
+                                    "Seleccionar Planta:",
+                                    options=plantas_disponibles,
+                                    key=f"planta_{zona_seleccionada}"
+                                )
+                                
+                                # Filtrar datos por planta
+                                df_planta = df_zona[df_zona['Planta'] == planta_seleccionada]
+                                
+                                if not df_planta.empty:
+                                    # Transponer: semanas como columnas, variables como filas
+                                    variables = [
+                                        'Reses Int', 'Reses Comp', 
+                                        'Costo Int ($)', 'Costo Comp ($)',
+                                        'Costo Sac Int ($)', 'Costo Sac Comp ($)',
+                                        'Ingreso Int ($)', 'Ingreso Comp ($)',
+                                        'Margen Int ($)', 'Margen Comp ($)',
+                                        'Margen Total ($)'
+                                    ]
+                                    
+                                    # Crear DataFrame transpuesto
+                                    pivot_data = []
+                                    for var in variables:
+                                        row = {'Variable': var}
+                                        for _, row_data in df_planta.iterrows():
+                                            semana = row_data['Semana']
+                                            valor = row_data[var]
+                                            # Formatear según tipo de variable
+                                            if 'Costo' in var or 'Ingreso' in var or 'Margen' in var:
+                                                row[semana] = f"${valor:,.0f}"
+                                            else:
+                                                row[semana] = f"{valor:,.0f}"
+                                        pivot_data.append(row)
+                                    
+                                    df_pivot = pd.DataFrame(pivot_data)
+                                    
+                                    # Agregar fila de TOTAL
+                                    total_row = {'Variable': 'TOTAL'}
+                                    for semana in df_planta['Semana'].unique():
+                                        # Sumar reses
+                                        total_reses = df_planta[df_planta['Semana'] == semana][['Reses Int', 'Reses Comp']].sum().sum()
+                                        total_row[semana] = f"{total_reses:,.0f}"
+                                    pivot_data.append(total_row)
+                                    
+                                    df_pivot = pd.DataFrame(pivot_data)
+                                    
+                                    # Mostrar tabla pivotada
+                                    st.subheader(f"Detalle por Semana - {planta_seleccionada}")
+                                    st.dataframe(
+                                        df_pivot,
+                                        use_container_width=True,
+                                        height=500
+                                    )
+                                    
+                                    # Mostrar resumen específico de la planta
+                                    st.subheader(f"Resumen Planta {planta_seleccionada}")
+                                    col1, col2, col3 = st.columns(3)
+                                    
+                                    with col1:
+                                        total_planta = df_planta['Reses Int'].sum() + df_planta['Reses Comp'].sum()
+                                        st.metric("Total Reses Planta", f"{total_planta:,.0f}")
+                                    
+                                    with col2:
+                                        costo_planta = df_planta['Costo Int ($)'].sum() + df_planta['Costo Comp ($)'].sum()
+                                        st.metric("Costo Total Planta", f"${costo_planta:,.0f}")
+                                    
+                                    with col3:
+                                        margen_planta = df_planta['Margen Total ($)'].sum()
+                                        st.metric("Margen Planta", f"${margen_planta:,.0f}")
+                                    
+                                else:
+                                    st.info(f"No hay datos para la planta {planta_seleccionada} en la zona {zona_seleccionada}")
                             
-                            # Mostrar gráfico de distribución por semana
-                            st.subheader(f"Distribución Semanal - {zona_seleccionada}")
+                            # Tabla original para referencia (opcional)
+                            with st.expander("Ver datos originales"):
+                                st.dataframe(
+                                    df_zona.style.format({
+                                        'Reses Int': '{:,.0f}',
+                                        'Reses Comp': '{:,.0f}',
+                                        'Costo Int ($)': '${:,.0f}',
+                                        'Costo Comp ($)': '${:,.0f}',
+                                        'Costo Sac Int ($)': '${:,.0f}',
+                                        'Costo Sac Comp ($)': '${:,.0f}',
+                                        'Ingreso Int ($)': '${:,.0f}',
+                                        'Ingreso Comp ($)': '${:,.0f}',
+                                        'Margen Int ($)': '${:,.0f}',
+                                        'Margen Comp ($)': '${:,.0f}',
+                                        'Margen Total ($)': '${:,.0f}'
+                                    }),
+                                    use_container_width=True,
+                                    height=300
+                                )
                             
-                            # Opción para tipo de gráfico
-                            chart_type = st.radio(
-                                "Tipo de visualización:",
-                                ["Barras", "Líneas"],
-                                horizontal=True,
-                                key=f"chart_type_{zona_seleccionada}"
-                            )
+                            # Gráficos (opcional, puedes mantener los que tenías o ajustarlos)
+                            st.subheader(f"Gráficos - {zona_seleccionada}")
                             
-                            if chart_type == "Barras":
-                                chart_data = df_zona_semanal[['Semana', 'Reses Integradas', 'Reses Compradas']].set_index('Semana')
+                            if vista_tipo == "Consolidado":
+                                # Gráfico para vista consolidada
+                                chart_data = df_consolidado[['Semana', 'Reses Int', 'Reses Comp']].set_index('Semana')
                                 st.bar_chart(chart_data)
                             else:
-                                # Usar Plotly para gráfico de líneas
-                                try:
-                                    import plotly.express as px
-                                    df_melted = pd.melt(
-                                        df_zona_semanal,
-                                        id_vars=['Semana'],
-                                        value_vars=['Reses Integradas', 'Reses Compradas'],
-                                        var_name='Tipo Res',
-                                        value_name='Cantidad'
-                                    )
-                                    fig = px.line(
-                                        df_melted,
-                                        x='Semana',
-                                        y='Cantidad',
-                                        color='Tipo Res',
-                                        title=f"Evolución Semanal - {zona_seleccionada}",
-                                        markers=True
-                                    )
-                                    st.plotly_chart(fig, use_container_width=True)
-                                except:
-                                    # Fallback a gráfico de líneas de Streamlit
-                                    st.line_chart(chart_data)
-                            
+                                # Gráfico para vista por planta
+                                if not df_planta.empty:
+                                    chart_data = df_planta[['Semana', 'Reses Int', 'Reses Comp']].set_index('Semana')
+                                    st.bar_chart(chart_data)
+                        
                         else:
                             st.info(f"⚠️ No hay asignaciones para la zona {zona_seleccionada} en la solución óptima.")
                 
@@ -750,5 +880,6 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
