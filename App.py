@@ -9,6 +9,58 @@ import matplotlib
 st.set_page_config(page_title="Modelo de Sacrificio de Reses", layout="wide")
 st.title("Optimización de Sacrificio de Reses")
 
+def aplicar_estilos_financiera(df):
+    """
+    Aplica estilos condicionales a la tabla financiera.
+    CORRECCIÓN: Devuelve un DataFrame de estilos compatible con axis=None.
+    """
+    # 1. Crear un DataFrame de estilos vacío con la misma estructura que df
+    styles = pd.DataFrame('', index=df.index, columns=df.columns)
+    
+    # Si no existe la columna Concepto o el df está vacío, retornamos estilos vacíos
+    if 'Concepto' not in df.columns or df.empty:
+        return styles
+
+    # 2. Iterar sobre las filas para aplicar lógica
+    for idx, row in df.iterrows():
+        # Convertimos a string para evitar errores si hay valores nulos
+        concepto = str(row['Concepto'])
+        estilo_fila = ''
+        
+        # Determinar el estilo base según el texto en 'Concepto'
+        if 'SUBTOTAL' in concepto:
+            estilo_fila = 'font-weight: bold; background-color: #f0f0f0; color: black'
+        elif 'Costo' in concepto and 'Ingreso' not in concepto:
+            estilo_fila = 'color: #d62728'  # Rojo
+        elif 'Ingreso' in concepto:
+            estilo_fila = 'color: #2ca02c'  # Verde
+            
+        # Aplicar el estilo a toda la fila
+        if estilo_fila:
+            styles.loc[idx, :] = estilo_fila
+            
+        # Refinar: añadir negrita extra solo a la celda del título 'Concepto' si es Costo o Ingreso
+        if ('Costo' in concepto or 'Ingreso' in concepto) and 'SUBTOTAL' not in concepto:
+            styles.loc[idx, 'Concepto'] = f"{estilo_fila}; font-weight: bold"
+
+    return styles
+
+def mostrar_dataframe_con_estilos(df, height=400):
+    """Muestra un DataFrame con estilos aplicados y maneja errores."""
+    try:
+        # Aplicamos la función de estilos
+        st.dataframe(
+            df.style.apply(aplicar_estilos_financiera, axis=None),
+            use_container_width=True, 
+            height=height
+        )
+    except Exception as e:
+        # Si falla el estilo, mostramos la tabla normal y el error como advertencia
+        st.warning(f"No se pudieron aplicar los colores: {e}")
+        st.dataframe(df, use_container_width=True, height=height)
+
+# --- FIN BLOQUE DE ESTILOS ---
+
 # Función para cargar y procesar el archivo Excel
 def procesar_archivo(uploaded_file):
     try:
@@ -300,33 +352,6 @@ if uploaded_file is not None:
                     return variable
                 else:
                     return 0
-            # DEFINIR FUNCIÓN DE ESTILOS AQUÍ (ANTES DE USARLA)
-            def aplicar_estilos_financiera(df):
-                """Aplica estilos condicionales a la tabla financiera."""
-                styles = []
-                for idx, row in df.iterrows():
-                    if 'Concepto' in df.columns:
-                        concepto = row['Concepto']
-                        if 'SUBTOTAL' in str(concepto):
-                            styles.append(['font-weight: bold; background-color: #f0f0f0'] * len(row))
-                        elif 'Costo' in str(concepto) and 'Ingreso' not in str(concepto):
-                            styles.append(['color: #d62728'] * len(row))  # Rojo para costos
-                        elif 'Ingreso' in str(concepto):
-                            styles.append(['color: #2ca02c'] * len(row))  # Verde para ingresos
-                        else:
-                            styles.append([''] * len(row))
-                    else:
-                        styles.append([''] * len(row))
-                return styles
-            def mostrar_dataframe_con_estilos(df, height=400):
-                """Muestra un DataFrame con estilos aplicados de forma segura."""
-                try:
-                    styled_df = df.style.apply(aplicar_estilos_financiera, axis=None)
-                    st.dataframe(styled_df, use_container_width=True, height=height)
-                except Exception as e:
-                    st.warning(f"Error al aplicar estilos: {str(e)}")
-                    # Fallback: mostrar sin estilos
-                    st.dataframe(df, use_container_width=True, height=height)
     
             if 'contexto' in st.session_state:
                 zonas_disponibles = contexto['Zona']
@@ -980,6 +1005,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
