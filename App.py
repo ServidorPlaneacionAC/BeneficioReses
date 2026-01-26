@@ -302,50 +302,30 @@ if uploaded_file is not None:
                     return 0
             # DEFINIR FUNCIÓN DE ESTILOS AQUÍ (ANTES DE USARLA)
             def aplicar_estilos_financiera(df):
-                """
-                Aplica estilos condicionales a la tabla financiera.
-                CORRECCIÓN: Devuelve un DataFrame de estilos en lugar de una lista.
-                """
-                # 1. Crear un DataFrame de estilos lleno de cadenas vacías con la misma forma que df
-                styles = pd.DataFrame('', index=df.index, columns=df.columns)
-                
-                # Si no existe la columna Concepto, retornamos sin cambios
-                if 'Concepto' not in df.columns:
-                    return styles
-            
-                # 2. Iterar y aplicar lógica
+                """Aplica estilos condicionales a la tabla financiera."""
+                styles = []
                 for idx, row in df.iterrows():
-                    concepto = str(row['Concepto'])
-                    estilo_fila = ''
-                    
-                    if 'SUBTOTAL' in concepto:
-                        estilo_fila = 'font-weight: bold; background-color: #f0f0f0; color: black'
-                    elif 'Costo' in concepto and 'Ingreso' not in concepto:
-                        estilo_fila = 'color: #d62728'  # Rojo
-                    elif 'Ingreso' in concepto:
-                        estilo_fila = 'color: #2ca02c'  # Verde
-                        
-                    # Aplicar el estilo base a toda la fila
-                    if estilo_fila:
-                        styles.loc[idx, :] = estilo_fila
-                        
-                    # Refinar estilo específico para la columna 'Concepto' (añadir negrita a costos/ingresos)
-                    if 'Costo' in concepto or 'Ingreso' in concepto:
-                         # Mantenemos el color y agregamos negrita solo a la celda del nombre
-                        styles.loc[idx, 'Concepto'] = f"{estilo_fila}; font-weight: bold"
-            
+                    if 'Concepto' in df.columns:
+                        concepto = row['Concepto']
+                        if 'SUBTOTAL' in str(concepto):
+                            styles.append(['font-weight: bold; background-color: #f0f0f0'] * len(row))
+                        elif 'Costo' in str(concepto) and 'Ingreso' not in str(concepto):
+                            styles.append(['color: #d62728'] * len(row))  # Rojo para costos
+                        elif 'Ingreso' in str(concepto):
+                            styles.append(['color: #2ca02c'] * len(row))  # Verde para ingresos
+                        else:
+                            styles.append([''] * len(row))
+                    else:
+                        styles.append([''] * len(row))
                 return styles
-            
             def mostrar_dataframe_con_estilos(df, height=400):
                 """Muestra un DataFrame con estilos aplicados de forma segura."""
                 try:
-                    # Aplicamos la función de estilos
-                    # axis=None envía todo el DataFrame a la función
-                    mostrar_dataframe_con_estilos(df_financiera, height=400)
-                    
+                    styled_df = df.style.apply(aplicar_estilos_financiera, axis=None)
+                    st.dataframe(styled_df, use_container_width=True, height=height)
                 except Exception as e:
-                    # Si falla el estilo, mostramos la tabla plana para que la app no se rompa
-                    st.warning(f"No se pudieron aplicar los estilos visuales: {e}")
+                    st.warning(f"Error al aplicar estilos: {str(e)}")
+                    # Fallback: mostrar sin estilos
                     st.dataframe(df, use_container_width=True, height=height)
     
             if 'contexto' in st.session_state:
@@ -573,7 +553,7 @@ if uploaded_file is not None:
                                 df_financiera = pd.DataFrame(pivot_data_fin)
                                 
                                 # Mostrar tabla con estilos
-                                mostrar_dataframe_con_estilos(df_financiera_planta, height=400)
+                                mostrar_dataframe_con_estilos(df_financiera, height=400)
                                 
                             else:  # Vista por Planta
                                 # Mostrar selector de planta
@@ -1000,9 +980,6 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
-
-
-
 
 
 
