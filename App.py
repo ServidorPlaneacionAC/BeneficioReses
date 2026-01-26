@@ -318,6 +318,16 @@ if uploaded_file is not None:
                     else:
                         styles.append([''] * len(row))
                 return styles
+            def mostrar_dataframe_con_estilos(df, height=400):
+                """Muestra un DataFrame con estilos aplicados de forma segura."""
+                try:
+                    styled_df = df.style.apply(aplicar_estilos_financiera, axis=None)
+                    st.dataframe(styled_df, use_container_width=True, height=height)
+                except Exception as e:
+                    st.warning(f"Error al aplicar estilos: {str(e)}")
+                    # Fallback: mostrar sin estilos
+                    st.dataframe(df, use_container_width=True, height=height)
+    
             if 'contexto' in st.session_state:
                 zonas_disponibles = contexto['Zona']
                 
@@ -544,7 +554,7 @@ if uploaded_file is not None:
                                 
                                 # Mostrar tabla con estilos
                                 st.dataframe(
-                                    df_financiera.style.apply(aplicar_estilos_financiera, axis=None),
+                                    mostrar_dataframe_con_estilos(df_financiera, height=400),
                                     use_container_width=True,
                                     height=400
                                 )
@@ -650,7 +660,7 @@ if uploaded_file is not None:
                                     
                                     # Mostrar tabla con estilos
                                     st.dataframe(
-                                        df_financiera_planta.style.apply(aplicar_estilos_financiera, axis=None),
+                                        mostrar_dataframe_con_estilos(df_financiera, height=400),
                                         use_container_width=True,
                                         height=400
                                     )
@@ -978,6 +988,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
