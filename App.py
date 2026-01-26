@@ -237,6 +237,8 @@ def ejecutar_modelo(inputs_opt_res, valor_kg):
             'Valorización Total': val_valorizacion  # <--- Aquí está la corrección clave
         }
         # -----------------------------------------------------------
+
+        return modelo, contexto, costos
         
     except Exception as e:
         st.error(f"Error al ejecutar el modelo: {str(e)}")
@@ -1080,6 +1082,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
