@@ -194,7 +194,7 @@ def ejecutar_modelo(inputs_opt_res, valor_kg):
         
         # Calcular métricas de costos
         # --- BLOQUE CORREGIDO PARA CALCULAR COSTOS ---
-        # 1. Calcular los valores individuales primero
+        # 1. Calcular cada componente por separado para asegurar precisión
         val_costo_int = sum(res_int[z,p,t].varValue * Precio_Int.get((z),0) 
                             for z in Zona for p in Planta_S for t in Semana)
         
@@ -219,7 +219,14 @@ def ejecutar_modelo(inputs_opt_res, valor_kg):
                      sum(res_comp[z,p,t].varValue * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg 
                          for z in Zona for p in Planta_S for t in Semana))
 
-        # 2. Crear el diccionario final con la Valorización Aritmética (Ingreso - Costos)
+        # 2. Calcular la Valorización Total como una RESTA simple (Ingreso - Costos)
+        # Esto garantiza que el valor coincida visualmente con la tabla
+        total_costos = (val_costo_int + val_costo_comp + val_costo_sac + 
+                        val_costo_tte_res + val_costo_tte_pt)
+                        
+        val_valorizacion = val_carne - total_costos
+
+        # 3. Construir el diccionario final
         costos = {
             'Costo Integración': val_costo_int,
             'Costo Compras': val_costo_comp,
@@ -227,9 +234,9 @@ def ejecutar_modelo(inputs_opt_res, valor_kg):
             'Costo Transporte Reses': val_costo_tte_res,
             'Costo Transporte Canales': val_costo_tte_pt,
             'Valor Carne': val_carne,
-            # CORRECCIÓN: Cálculo aritmético directo para que coincida con la tabla
-            'Valorización Total': val_carne - (val_costo_int + val_costo_comp + val_costo_sac + val_costo_tte_res + val_costo_tte_pt)
+            'Valorización Total': val_valorizacion  # <--- Aquí está la corrección clave
         }
+        # -----------------------------------------------------------
         
     except Exception as e:
         st.error(f"Error al ejecutar el modelo: {str(e)}")
@@ -1073,6 +1080,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
