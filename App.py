@@ -193,29 +193,43 @@ def ejecutar_modelo(inputs_opt_res, valor_kg):
         }
         
         # Calcular métricas de costos
-        costos = {
-            'Costo Integración': sum(res_int[z,p,t].varValue * Precio_Int.get((z),0) 
-                                for z in Zona for p in Planta_S for t in Semana),
-            'Costo Compras': sum(res_comp[z,p,t].varValue * Precio_Comp.get((z),0) 
-                            for z in Zona for p in Planta_S for t in Semana),
-            'Costo Sacrificio': sum(res_int[z,p,t].varValue * Costo_Sac.get((p),0) 
-                               for z in Zona for p in Planta_S for t in Semana) +
-                              sum(res_comp[z,p,t].varValue * Costo_Sac.get((p),0) 
-                               for z in Zona for p in Planta_S for t in Semana),
-            'Costo Transporte Reses': sum(viaje_int[z,p,t].varValue * Costo_Viaje_Int.get((z,p),0) 
-                                     for z in Zona for p in Planta_S for t in Semana) +
-                                     sum(viaje_com[z,p,t].varValue * Costo_Viaje_Comp.get((z,p),0) 
-                                     for z in Zona for p in Planta_S for t in Semana),
-            'Costo Transporte Canales': sum(viaje_envigado[p,t].varValue * Costo_Tans_PT.get((p),0) 
-                                       for p in Planta_S for t in Semana),
-            'Valor Carne': sum(res_int[z,p,t].varValue * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg 
-                             for z in Zona for p in Planta_S for t in Semana) +
-                          sum(res_comp[z,p,t].varValue * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg 
-                             for z in Zona for p in Planta_S for t in Semana),
-            'Valorización Total': value(modelo.objective)
-        }
+        # --- BLOQUE CORREGIDO PARA CALCULAR COSTOS ---
+        # 1. Calcular los valores individuales primero
+        val_costo_int = sum(res_int[z,p,t].varValue * Precio_Int.get((z),0) 
+                            for z in Zona for p in Planta_S for t in Semana)
         
-        return modelo, contexto, costos
+        val_costo_comp = sum(res_comp[z,p,t].varValue * Precio_Comp.get((z),0) 
+                             for z in Zona for p in Planta_S for t in Semana)
+        
+        val_costo_sac = (sum(res_int[z,p,t].varValue * Costo_Sac.get((p),0) 
+                             for z in Zona for p in Planta_S for t in Semana) +
+                         sum(res_comp[z,p,t].varValue * Costo_Sac.get((p),0) 
+                             for z in Zona for p in Planta_S for t in Semana))
+        
+        val_costo_tte_res = (sum(viaje_int[z,p,t].varValue * Costo_Viaje_Int.get((z,p),0) 
+                                 for z in Zona for p in Planta_S for t in Semana) +
+                             sum(viaje_com[z,p,t].varValue * Costo_Viaje_Comp.get((z,p),0) 
+                                 for z in Zona for p in Planta_S for t in Semana))
+        
+        val_costo_tte_pt = sum(viaje_envigado[p,t].varValue * Costo_Tans_PT.get((p),0) 
+                               for p in Planta_S for t in Semana)
+        
+        val_carne = (sum(res_int[z,p,t].varValue * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg 
+                         for z in Zona for p in Planta_S for t in Semana) +
+                     sum(res_comp[z,p,t].varValue * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg 
+                         for z in Zona for p in Planta_S for t in Semana))
+
+        # 2. Crear el diccionario final con la Valorización Aritmética (Ingreso - Costos)
+        costos = {
+            'Costo Integración': val_costo_int,
+            'Costo Compras': val_costo_comp,
+            'Costo Sacrificio': val_costo_sac,
+            'Costo Transporte Reses': val_costo_tte_res,
+            'Costo Transporte Canales': val_costo_tte_pt,
+            'Valor Carne': val_carne,
+            # CORRECCIÓN: Cálculo aritmético directo para que coincida con la tabla
+            'Valorización Total': val_carne - (val_costo_int + val_costo_comp + val_costo_sac + val_costo_tte_res + val_costo_tte_pt)
+        }
         
     except Exception as e:
         st.error(f"Error al ejecutar el modelo: {str(e)}")
@@ -1059,6 +1073,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
