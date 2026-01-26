@@ -300,7 +300,24 @@ if uploaded_file is not None:
                     return variable
                 else:
                     return 0
-            
+            # DEFINIR FUNCIÓN DE ESTILOS AQUÍ (ANTES DE USARLA)
+            def aplicar_estilos_financiera(df):
+                """Aplica estilos condicionales a la tabla financiera."""
+                styles = []
+                for idx, row in df.iterrows():
+                    if 'Concepto' in df.columns:
+                        concepto = row['Concepto']
+                        if 'SUBTOTAL' in str(concepto):
+                            styles.append(['font-weight: bold; background-color: #f0f0f0'] * len(row))
+                        elif 'Costo' in str(concepto) and 'Ingreso' not in str(concepto):
+                            styles.append(['color: #d62728'] * len(row))  # Rojo para costos
+                        elif 'Ingreso' in str(concepto):
+                            styles.append(['color: #2ca02c'] * len(row))  # Verde para ingresos
+                        else:
+                            styles.append([''] * len(row))
+                    else:
+                        styles.append([''] * len(row))
+                return styles
             if 'contexto' in st.session_state:
                 zonas_disponibles = contexto['Zona']
                 
@@ -369,27 +386,7 @@ if uploaded_file is not None:
                                         'Costo Sac Comp ($)': round(costo_sac_comp, 2),
                                         'Ingreso Int ($)': round(ingreso_int, 2),
                                         'Ingreso Comp ($)': round(ingreso_comp, 2)
-                                    })
-                        
-                        # DEFINIR FUNCIÓN DE ESTILOS AQUÍ (ANTES DE USARLA)
-                        def aplicar_estilos_financiera(df):
-                            """Aplica estilos condicionales a la tabla financiera."""
-                            styles = []
-                            for idx, row in df.iterrows():
-                                if 'Concepto' in df.columns:
-                                    concepto = row['Concepto']
-                                    if 'SUBTOTAL' in str(concepto):
-                                        styles.append(['font-weight: bold; background-color: #f0f0f0'] * len(row))
-                                    elif 'Costo' in str(concepto) and 'Ingreso' not in str(concepto):
-                                        styles.append(['color: #d62728'] * len(row))  # Rojo para costos
-                                    elif 'Ingreso' in str(concepto):
-                                        styles.append(['color: #2ca02c'] * len(row))  # Verde para ingresos
-                                    else:
-                                        styles.append([''] * len(row))
-                                else:
-                                    styles.append([''] * len(row))
-                            return styles
-                        
+                                    })                     
                         if zona_data:
                             df_zona = pd.DataFrame(zona_data)
                             
@@ -981,6 +978,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
