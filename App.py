@@ -495,7 +495,7 @@ if uploaded_file is not None:
                                     df_view = df_view.rename(columns=nombres_descriptivos)
                                     df_view = df_view.set_index('Semana')
                                     return df_view.style.format("{:,.0f}")
-    
+                            
                                 elif tipo_tabla == "Financiera":
                                     df['Subtotal Reses'] = df['Costo Int ($)'] + df['Costo Comp ($)']
                                     df['Subtotal Sac'] = df['Costo Sac Int ($)'] + df['Costo Sac Comp ($)']
@@ -523,12 +523,22 @@ if uploaded_file is not None:
                                         cols_ingresos = [c for c in df_view.columns if 'Ingreso' in c and 'SUBTOTAL' not in c]
                                         cols_subtotales = [c for c in df_view.columns if 'SUBTOTAL' in c]
                                         
+                                        # Aplicar colores a las columnas
                                         styler.applymap(lambda x: 'color: #d62728;', subset=cols_costos) # Rojo
                                         styler.applymap(lambda x: 'color: #2ca02c;', subset=cols_ingresos) # Verde
                                         styler.applymap(lambda x: 'font-weight: bold; background-color: #f0f0f0; color: black;', subset=cols_subtotales)
-                                        styler.apply(lambda x: ['font-weight: bold; border-top: 2px solid black' for _ in x], axis=1, subset=pd.Index(['TOTAL']))
+                                        
+                                        # CORRECCIÓN AQUÍ: Función para resaltar la fila TOTAL sin usar subset problemático
+                                        def highlight_total_row(row):
+                                            if row.name == 'TOTAL':
+                                                return ['font-weight: bold; border-top: 2px solid black; background-color: #e6e6e6; color: black'] * len(row)
+                                            return [''] * len(row)
+                            
+                                        # Aplicar a todas las filas (axis=1), la lógica interna filtra 'TOTAL'
+                                        styler.apply(highlight_total_row, axis=1)
+                                        
                                         return styler
-    
+                            
                                     return estilo_financiero_columnas(df_view.style)
     
                             # --- Visualización ---
@@ -861,6 +871,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
