@@ -573,11 +573,7 @@ if uploaded_file is not None:
                                 df_financiera = pd.DataFrame(pivot_data_fin)
                                 
                                 # Mostrar tabla con estilos
-                                st.dataframe(
-                                    mostrar_dataframe_con_estilos(df_financiera, height=400),
-                                    use_container_width=True,
-                                    height=400
-                                )
+                                mostrar_dataframe_con_estilos(df_financiera_planta, height=400)
                                 
                             else:  # Vista por Planta
                                 # Mostrar selector de planta
@@ -679,11 +675,7 @@ if uploaded_file is not None:
                                     df_financiera_planta = pd.DataFrame(pivot_data_fin_planta)
                                     
                                     # Mostrar tabla con estilos
-                                    st.dataframe(
-                                        mostrar_dataframe_con_estilos(df_financiera, height=400),
-                                        use_container_width=True,
-                                        height=400
-                                    )
+                                    mostrar_dataframe_con_estilos(df_financiera_planta, height=400)
                                     
                                 else:
                                     st.info(f"No hay datos para la planta {planta_seleccionada} en la zona {zona_seleccionada}")
@@ -1008,6 +1000,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
