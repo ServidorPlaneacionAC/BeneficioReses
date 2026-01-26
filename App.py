@@ -827,6 +827,7 @@ if uploaded_file is not None:
                         st.subheader("Detalle por Semana y Planta")
                         st.dataframe(
                             df_transporte.style.format({
+                                'Semana': '{:.2f}',  # <--- ESTA LÍNEA ELIMINA LOS CEROS EXTRA
                                 'Viajes Integrados': '{:,.0f}',
                                 'Viajes Comprados': '{:,.0f}',
                                 'Costo por Viaje Int ($)': '${:,.0f}',
@@ -1058,6 +1059,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
