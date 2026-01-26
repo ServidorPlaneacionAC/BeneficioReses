@@ -177,6 +177,11 @@ def ejecutar_modelo(inputs_opt_res, valor_kg):
                 'Precio_Int': Precio_Int,
                 'Precio_Comp': Precio_Comp,
                 'Costo_Sac': Costo_Sac,
+                # --- AGREGADOS LOS COSTOS DE TRANSPORTE FALTANTES ---
+                'Costo_Viaje_Int': Costo_Viaje_Int,
+                'Costo_Viaje_Comp': Costo_Viaje_Comp,
+                'Costo_Tans_PT': Costo_Tans_PT,
+                # ----------------------------------------------------
                 'Peso_Res': Peso_Res,
                 'rdto': rdto,
                 'valor_kg': valor_kg,
@@ -1004,4 +1009,5 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
