@@ -341,11 +341,8 @@ if uploaded_file is not None:
                 try:
                     # Aplicamos la función de estilos
                     # axis=None envía todo el DataFrame a la función
-                    st.dataframe(
-                        df.style.apply(aplicar_estilos_financiera, axis=None),
-                        use_container_width=True, 
-                        height=height
-                    )
+                    mostrar_dataframe_con_estilos(df_financiera, height=400)
+                    
                 except Exception as e:
                     # Si falla el estilo, mostramos la tabla plana para que la app no se rompa
                     st.warning(f"No se pudieron aplicar los estilos visuales: {e}")
@@ -1011,6 +1008,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
