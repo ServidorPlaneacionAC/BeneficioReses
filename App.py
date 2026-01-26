@@ -342,9 +342,13 @@ if uploaded_file is not None:
             st.dataframe(df_costos.style.format("{:,.0f}"))
 
             def calcular_escenario_hipotetico_detallado(contexto, planta_objetivo="AGUACHICA"):
-                """Calcula los costos desglosados si todo se enviara a una sola planta."""
-                
-                # Inicializar acumuladores idénticos a la estructura de 'costos'
+                """
+                Calcula los costos si todo se enviara a una sola planta.
+                CORRECCIÓN: Agrupa reses por (Zona, Semana) antes de calcular camiones para optimizar el flete.
+                """
+                import math
+
+                # Inicializar acumuladores
                 acumuladores = {
                     'Costo Integración': 0,
                     'Costo Compras': 0,
@@ -354,9 +358,14 @@ if uploaded_file is not None:
                     'Valor Carne': 0
                 }
                 
+                # Estructuras para agrupar volumenes totales por (Zona, Semana)
+                # Separamos Integradas vs Compradas por si tienen contratos de flete distintos
+                volumen_int = {}   # Clave: (zona, semana) -> Valor: cantidad_total
+                volumen_comp = {}  # Clave: (zona, semana) -> Valor: cantidad_total
+                
                 total_reses_procesadas = 0
                 
-                # Diccionarios de parámetros
+                # Parametros
                 P_Int = contexto['parametros']['Precio_Int']
                 P_Comp = contexto['parametros']['Precio_Comp']
                 C_Viaje_Int = contexto['parametros']['Costo_Viaje_Int']
@@ -368,52 +377,87 @@ if uploaded_file is not None:
                 
                 if planta_objetivo not in C_Sac: return None
 
-                # 1. Procesar Reses Integradas
+                # -------------------------------------------------------
+                # PASO 1: ACUMULAR COSTOS DIRECTOS Y VOLUMENES (Sin flete aún)
+                # -------------------------------------------------------
+                
+                # Reses Integradas
                 for (z, p, t), var in contexto['variables']['res_int'].items():
                     if var.varValue and var.varValue > 0:
-                        cantidad = var.varValue
-                        total_reses_procesadas += cantidad
+                        qty = var.varValue
+                        total_reses_procesadas += qty
                         
-                        acumuladores['Costo Integración'] += cantidad * P_Int.get(z, 0)
-                        acumuladores['Costo Transporte Reses'] += cantidad * C_Viaje_Int.get((z, planta_objetivo), 0)
-                        acumuladores['Costo Sacrificio'] += cantidad * C_Sac.get(planta_objetivo, 0)
+                        # Costos que son por unidad (independiente del camión)
+                        acumuladores['Costo Integración'] += qty * P_Int.get(z, 0)
+                        acumuladores['Costo Sacrificio'] += qty * C_Sac.get(planta_objetivo, 0)
                         
                         rdto_agua = Rendimiento.get((z, planta_objetivo), 0)
-                        acumuladores['Valor Carne'] += cantidad * Peso.get(z, 0) * rdto_agua * Val_Kg
+                        acumuladores['Valor Carne'] += qty * Peso.get(z, 0) * rdto_agua * Val_Kg
+                        
+                        # Agrupar volumen para calcular camiones después
+                        if (z, t) not in volumen_int: volumen_int[(z, t)] = 0
+                        volumen_int[(z, t)] += qty
 
-                # 2. Procesar Reses Compradas
+                # Reses Compradas
                 for (z, p, t), var in contexto['variables']['res_comp'].items():
                     if var.varValue and var.varValue > 0:
-                        cantidad = var.varValue
-                        total_reses_procesadas += cantidad
+                        qty = var.varValue
+                        total_reses_procesadas += qty
                         
-                        acumuladores['Costo Compras'] += cantidad * P_Comp.get(z, 0)
-                        acumuladores['Costo Transporte Reses'] += cantidad * C_Viaje_Comp.get((z, planta_objetivo), 0)
-                        acumuladores['Costo Sacrificio'] += cantidad * C_Sac.get(planta_objetivo, 0)
+                        # Costos por unidad
+                        acumuladores['Costo Compras'] += qty * P_Comp.get(z, 0)
+                        acumuladores['Costo Sacrificio'] += qty * C_Sac.get(planta_objetivo, 0)
                         
                         rdto_agua = Rendimiento.get((z, planta_objetivo), 0)
-                        acumuladores['Valor Carne'] += cantidad * Peso.get(z, 0) * rdto_agua * Val_Kg
+                        acumuladores['Valor Carne'] += qty * Peso.get(z, 0) * rdto_agua * Val_Kg
+                        
+                        # Agrupar volumen
+                        if (z, t) not in volumen_comp: volumen_comp[(z, t)] = 0
+                        volumen_comp[(z, t)] += qty
 
-                # 3. Transporte Canales
-                import math
-                # Asumiendo 84 canales por viaje como en el modelo original
-                viajes = math.ceil(total_reses_procesadas / 84) if total_reses_procesadas > 0 else 0
-                acumuladores['Costo Transporte Canales'] = viajes * contexto['parametros']['Costo_Tans_PT'].get(planta_objetivo, 0)
+                # -------------------------------------------------------
+                # PASO 2: CALCULAR CAMIONES Y FLETES (Lógica optimizada)
+                # -------------------------------------------------------
+                
+                # Para Integradas: Sumamos todo lo de una zona/semana y ahí pedimos los camiones
+                for (z, t), cantidad_total in volumen_int.items():
+                    # Ahora sí: Total reses de la zona / 14
+                    viajes = math.ceil(cantidad_total / 14)
+                    costo_viaje = C_Viaje_Int.get((z, planta_objetivo), 0)
+                    acumuladores['Costo Transporte Reses'] += viajes * costo_viaje
 
-                # 4. Calcular Valorización Total
+                # Para Compradas
+                for (z, t), cantidad_total in volumen_comp.items():
+                    viajes = math.ceil(cantidad_total / 14)
+                    costo_viaje = C_Viaje_Comp.get((z, planta_objetivo), 0)
+                    acumuladores['Costo Transporte Reses'] += viajes * costo_viaje
+
+                # -------------------------------------------------------
+                # PASO 3: TRANSPORTE DE SALIDA (CANALES)
+                # -------------------------------------------------------
+                # Asumiendo 84 canales por camión refrigerado
+                viajes_canales = math.ceil(total_reses_procesadas / 84) if total_reses_procesadas > 0 else 0
+                acumuladores['Costo Transporte Canales'] = viajes_canales * contexto['parametros']['Costo_Tans_PT'].get(planta_objetivo, 0)
+
+                # Finalizar totales
                 costos_totales = sum([v for k, v in acumuladores.items() if 'Costo' in k])
                 acumuladores['Valorización Total'] = acumuladores['Valor Carne'] - costos_totales
                 
                 return acumuladores
 
-            # Ejecutar cálculo
+            # ==============================================================================
+            # BLOQUE DE EJECUCIÓN Y VISUALIZACIÓN (Pegar justo después de la función)
+            # ==============================================================================
+
+            # 1. Ejecutar el cálculo del escenario hipotético
             escenario_b = calcular_escenario_hipotetico_detallado(contexto, "AGUACHICA")
 
             if escenario_b:
                 st.markdown("---")
                 st.subheader("⚖️ Comparativo de Escenarios: Óptimo vs. Todo a Aguachica")
                 
-                # Crear DataFrame unificado
+                # 2. Crear DataFrame unificado
+                # Usamos las mismas claves del diccionario 'costos' original
                 filas = list(costos.keys()) 
                 
                 data_unificada = []
@@ -421,8 +465,11 @@ if uploaded_file is not None:
                     val_opt = costos[concepto]
                     val_agua = escenario_b.get(concepto, 0)
                     
-                    # Calcular diferencia y porcentaje
+                    # Calcular diferencia
                     diff = val_opt - val_agua
+                    
+                    # Calcular porcentaje: (Optimo - Base) / Base
+                    # Nota: Evitamos dividir por cero
                     pct = (diff / val_agua) if val_agua != 0 else 0.0
                     
                     data_unificada.append({
@@ -435,7 +482,7 @@ if uploaded_file is not None:
                 
                 df_comparativo = pd.DataFrame(data_unificada)
 
-                # Estilos visuales
+                # 3. Definir Estilos visuales
                 def estilo_comparativo_final(df_styler):
                     styler = df_styler.format({
                         'Escenario Óptimo': '${:,.0f}',
@@ -444,17 +491,18 @@ if uploaded_file is not None:
                         'Var. (%)': '{:.2%}'
                     })
                     
-                    # Colores para la variación
+                    # Función interna para colorear la variación
                     def color_var(val, concepto):
                         if 'Valorización' in concepto or 'Valor Carne' in concepto:
-                            # Para ingresos/utilidad: Positivo es verde (Mejor)
+                            # Para ingresos/utilidad: Positivo es verde (Mejor), Negativo es rojo
                             color = '#2ca02c' if val > 0 else '#d62728'
                         else:
-                            # Para costos: Negativo es verde (Ahorro) (diff = Opt - Agua)
+                            # Para costos: Negativo es verde (Ahorro), Positivo es rojo (Sobrecosto)
+                            # Como diff = Optimo - Aguachica, si es negativo significa que Optimo es más barato
                             color = '#2ca02c' if val < 0 else '#d62728'
                         return f'color: {color}; font-weight: bold'
 
-                    # Aplicar color columna Var. (%) fila por fila
+                    # Aplicar colores a la columna Var. (%)
                     styler.apply(lambda x: [color_var(x['Var. (%)'], x['Concepto']) if col == 'Var. (%)' else '' for col in x.index], axis=1)
                     
                     # Negrita a la fila de Valorización Total
@@ -462,9 +510,10 @@ if uploaded_file is not None:
                     
                     return styler
 
+                # 4. Mostrar la tabla
                 st.dataframe(estilo_comparativo_final(df_comparativo.style), use_container_width=True)
                 
-                # Métrica resumen
+                # 5. Mostrar Métrica de resumen
                 val_opt_total = costos['Valorización Total']
                 val_agua_total = escenario_b['Valorización Total']
                 mejora = val_opt_total - val_agua_total
@@ -1009,5 +1058,6 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
