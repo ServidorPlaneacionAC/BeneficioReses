@@ -159,7 +159,7 @@ def ejecutar_modelo(inputs_opt_res, valor_kg):
                 modelo += (lpSum(res_int[z,p,t] for z in Zona) + lpSum(res_comp[z,p,t] for z in Zona)) <= viaje_envigado[p,t] * 84
 
         # Resolver el modelo
-        modelo.solve(PULP_CBC_CMD(timeLimit=60))
+        modelo.solve(PULP_CBC_CMD(timeLimit=180))
         
         # Preparar resultados
         contexto = {
@@ -914,6 +914,7 @@ if uploaded_file is not None:
                     total_costo_int = 0
                     total_costo_comp = 0
                     total_costo_transporte = 0
+                    total_disponible_int = 0
                     
                     for t in semanas:
                         for p in plantas:
@@ -941,16 +942,32 @@ if uploaded_file is not None:
                             total_costo_comp += res_comp_val * precio_comp
                             total_costo_transporte += viaje_int_val * costo_viaje_int
                             total_costo_transporte += viaje_com_val * costo_viaje_comp
+
+                        # Calcular reses disponibles integradas para esta zona y semana
+                        # Acceder a Oferta_Int del contexto
+                        if 'Oferta_Int' in contexto['parametros']:
+                            oferta_semana = contexto['parametros']['Oferta_Int'].get((zona, t), 0)
+                            total_disponible_int += oferta_semana
+                        else:
+                            # Si no está en parámetros, intentar calcular desde datos originales
+                            oferta_semana = 0
+                            total_disponible_int += oferta_semana
+    
+                    # Calcular porcentaje de utilización de reses integradas
+                    porcentaje_utilizacion_int = (total_reses_int / total_disponible_int * 100) if total_disponible_int > 0 else 0
                     
                     resumen_zonas.append({
                         'Zona': zona,
-                        'Reses Integradas': total_reses_int,
-                        'Reses Compradas': total_reses_comp,
-                        'Total Reses': total_reses_int + total_reses_comp,
-                        'Costo Integración ($)': total_costo_int,
-                        'Costo Compras ($)': total_costo_comp,
-                        'Costo Transporte ($)': total_costo_transporte,
-                        'Costo Total ($)': total_costo_int + total_costo_comp + total_costo_transporte
+                        'Reses Disponibles Int.': int(total_disponible_int),  # Nueva columna
+                        'Reses Integradas': int(total_reses_int),
+                        '% Utilización Int.': round(porcentaje_utilizacion_int, 1),  # Nueva columna
+                        'Reses Compradas': int(total_reses_comp),
+                        'Total Reses': int(total_reses_int + total_reses_comp),
+                        'Costo Integración ($)': round(total_costo_int, 0),
+                        'Costo Compras ($)': round(total_costo_comp, 0),
+                        'Costo Transporte ($)': round(total_costo_transporte, 0),
+                        'Costo Total ($)': round(total_costo_int + total_costo_comp + total_costo_transporte, 0)
+    
                     })
                 
                 df_resumen_zonas = pd.DataFrame(resumen_zonas)
@@ -1082,6 +1099,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
