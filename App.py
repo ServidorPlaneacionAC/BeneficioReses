@@ -488,24 +488,26 @@ if uploaded_file is not None:
                     val_opt = costos[concepto]
                     val_agua = escenario_b.get(concepto, 0)
                     
-                    # Calcular diferencia
+                    # Calcular diferencia y porcentaje (Usamos valores absolutos para la lógica matemática)
                     diff = val_opt - val_agua
-                    
-                    # Calcular porcentaje: (Optimo - Base) / Base
-                    # Nota: Evitamos dividir por cero
                     pct = (diff / val_agua) if val_agua != 0 else 0.0
+                    
+                    # AJUSTE VISUAL: Si es costo, multiplicamos por -1 para mostrar negativo
+                    es_costo = 'Costo' in concepto
+                    val_opt_visual = val_opt * -1 if es_costo else val_opt
+                    val_agua_visual = val_agua * -1 if es_costo else val_agua
                     
                     data_unificada.append({
                         'Concepto': concepto,
-                        'Escenario Óptimo': val_opt,
-                        'Escenario Aguachica': val_agua,
+                        'Escenario Óptimo': val_opt_visual,
+                        'Escenario Aguachica': val_agua_visual,
                         'Diferencia ($)': diff,
                         'Var. (%)': pct
                     })
                 
                 df_comparativo = pd.DataFrame(data_unificada)
 
-                # 3. Definir Estilos visuales
+                # Estilos visuales
                 def estilo_comparativo_final(df_styler):
                     styler = df_styler.format({
                         'Escenario Óptimo': '${:,.0f}',
@@ -514,18 +516,14 @@ if uploaded_file is not None:
                         'Var. (%)': '{:.2%}'
                     })
                     
-                    # Función interna para colorear la variación
+                    # Colores para la variación
                     def color_var(val, concepto):
                         if 'Valorización' in concepto or 'Valor Carne' in concepto:
-                            # Para ingresos/utilidad: Positivo es verde (Mejor), Negativo es rojo
                             color = '#2ca02c' if val > 0 else '#d62728'
                         else:
-                            # Para costos: Negativo es verde (Ahorro), Positivo es rojo (Sobrecosto)
-                            # Como diff = Optimo - Aguachica, si es negativo significa que Optimo es más barato
                             color = '#2ca02c' if val < 0 else '#d62728'
                         return f'color: {color}; font-weight: bold'
 
-                    # Aplicar colores a la columna Var. (%)
                     styler.apply(lambda x: [color_var(x['Var. (%)'], x['Concepto']) if col == 'Var. (%)' else '' for col in x.index], axis=1)
                     
                     # Negrita a la fila de Valorización Total
@@ -533,10 +531,9 @@ if uploaded_file is not None:
                     
                     return styler
 
-                # 4. Mostrar la tabla
                 st.dataframe(estilo_comparativo_final(df_comparativo.style), use_container_width=True)
                 
-                # 5. Mostrar Métrica de resumen
+                # Métrica resumen
                 val_opt_total = costos['Valorización Total']
                 val_agua_total = escenario_b['Valorización Total']
                 mejora = val_opt_total - val_agua_total
@@ -636,29 +633,34 @@ if uploaded_file is not None:
                             df_zona = pd.DataFrame(zona_data)
                             
                             # Mostrar métricas resumidas
-                            st.subheader(f"Resumen - {zona_seleccionada}")
-                            col_a, col_b, col_c, col_d = st.columns(4)
+st.subheader(f"Resumen - {zona_seleccionada}")
+                            
+                            # Función auxiliar para métricas personalizadas (letra más pequeña y sin truncar)
+                            def metrica_personalizada(label, value):
+                                st.markdown(f"""
+                                <div style="background-color: #f8f9fa; padding: 10px; border-radius: 5px; border: 1px solid #e9ecef;">
+                                    <p style="margin: 0; font-size: 14px; color: #6c757d;">{label}</p>
+                                    <p style="margin: 0; font-size: 18px; font-weight: 600; color: #212529; word-wrap: break-word;">{value}</p>
+                                </div>
+                                """, unsafe_allow_html=True)
+
+                            # Cambiamos a 3 columnas (Eliminamos Ingreso Total y damos más espacio)
+                            col_a, col_b, col_c = st.columns(3)
+                            
+                            total_integradas = df_zona['Reses Int'].sum()
+                            total_compradas = df_zona['Reses Comp'].sum()
+                            total_costo_reses = df_zona['Costo Int ($)'].sum() + df_zona['Costo Comp ($)'].sum()
                             
                             with col_a:
-                                total_integradas = df_zona['Reses Int'].sum()
-                                st.metric(
-                                    label="Reses Integradas",
-                                    value=f"{total_integradas:,.0f}"
-                                )
+                                metrica_personalizada("Reses Integradas", f"{total_integradas:,.0f}")
                             
                             with col_b:
-                                total_compradas = df_zona['Reses Comp'].sum()
-                                st.metric(
-                                    label="Reses Compradas",
-                                    value=f"{total_compradas:,.0f}"
-                                )
+                                metrica_personalizada("Reses Compradas", f"{total_compradas:,.0f}")
                             
                             with col_c:
-                                total_costo_reses = df_zona['Costo Int ($)'].sum() + df_zona['Costo Comp ($)'].sum()
-                                st.metric(
-                                    label="Costo Total Reses",
-                                    value=f"${total_costo_reses:,.0f}"
-                                )
+                                metrica_personalizada("Costo Total Reses", f"${total_costo_reses:,.0f}")
+                            
+                            # Espacio separador antes de las tablas
                             
                             with col_d:
                                 total_ingreso = df_zona['Ingreso Int ($)'].sum() + df_zona['Ingreso Comp ($)'].sum()
@@ -666,6 +668,7 @@ if uploaded_file is not None:
                                     label="Ingreso Total",
                                     value=f"${total_ingreso:,.0f}"
                                 )
+                            st.markdown(" ")
                             
                             # 1. Definición de nombres y formatos
                             # 1. Definición de nombres y formatos
@@ -1099,6 +1102,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
