@@ -633,7 +633,7 @@ if uploaded_file is not None:
                             df_zona = pd.DataFrame(zona_data)
                             
                             # Mostrar métricas resumidas
-st.subheader(f"Resumen - {zona_seleccionada}")
+                        st.subheader(f"Resumen - {zona_seleccionada}")
                             
                             # Función auxiliar para métricas personalizadas (letra más pequeña y sin truncar)
                             def metrica_personalizada(label, value):
@@ -1102,6 +1102,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
