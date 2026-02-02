@@ -661,13 +661,6 @@ if uploaded_file is not None:
                                 metrica_personalizada("Costo Total Reses", f"${total_costo_reses:,.0f}")
                             
                             # Espacio separador antes de las tablas
-                            
-                            with col_d:
-                                total_ingreso = df_zona['Ingreso Int ($)'].sum() + df_zona['Ingreso Comp ($)'].sum()
-                                st.metric(
-                                    label="Ingreso Total",
-                                    value=f"${total_ingreso:,.0f}"
-                                )
                             st.markdown(" ")
                             
                             # 1. Definición de nombres y formatos
@@ -1102,6 +1095,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
