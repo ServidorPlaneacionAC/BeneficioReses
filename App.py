@@ -251,7 +251,7 @@ with st.sidebar:
     st.header("Configuración del Modelo")
     uploaded_file = st.file_uploader("Cargar archivo Excel con parámetros", type=['xlsx', 'xls'])
     valor_kg = st.number_input("Valor comercial de Kg de carne ($)", min_value=0.0, value=22000.0, step=1000.0)
-    MinCompra = st.number_input("Cantidad mínima viable para compra de reses", min_value=0, value=14, step=1)
+    MinCompra = st.number_input("Cantidad mínima viable para compra de reses", min_value=0.0, value=14.0, step=1.0)
         
     if uploaded_file is not None:
         st.success("Archivo cargado correctamente")
@@ -1098,6 +1098,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
