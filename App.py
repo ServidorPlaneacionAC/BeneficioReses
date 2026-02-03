@@ -88,7 +88,7 @@ def crear_diccionario(df, columnas_clave, columna_valor):
     return diccionario
 
 # Función principal del modelo
-def ejecutar_modelo(inputs_opt_res, valor_kg):
+def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
     try:
         # Definición de conjuntos
         Zona = list(set(inputs_opt_res['Oferta']['ZONA']))
@@ -119,6 +119,7 @@ def ejecutar_modelo(inputs_opt_res, valor_kg):
         viaje_int = LpVariable.dicts('viaje_Int_zona', [(z,p,t) for z in Zona for p in Planta_S for t in Semana], lowBound=0, cat='Integer')
         viaje_com = LpVariable.dicts('viaje_Com_zona', [(z,p,t) for z in Zona for p in Planta_S for t in Semana], lowBound=0, cat='Integer')
         viaje_envigado = LpVariable.dicts('viaje_envigado', [(p,t) for p in Planta_S for t in Semana], lowBound=0, cat='Integer')
+        compra_res = LpVariable.dicts('compra_res',[(z,t) for z in Zona for t in Semana],cat='Binary')
 
         # Función objetivo
         modelo += lpSum(
@@ -142,7 +143,7 @@ def ejecutar_modelo(inputs_opt_res, valor_kg):
         for z in Zona:
             for t in Semana:
                 modelo += lpSum(res_int[z,p,t] for p in Planta_S) <= Oferta_Int.get((z,t),0)
-                modelo += lpSum(res_comp[z,p,t] for p in Planta_S) <= Oferta_Com.get((z,t),0)
+                modelo += lpSum(res_comp[z,p,t] for p in Planta_S) <= Oferta_Com.get((z,t),0) * compra_res[z,t]
 
         for p in Planta_S:
             for t in Semana:
@@ -153,11 +154,12 @@ def ejecutar_modelo(inputs_opt_res, valor_kg):
                 for t in Semana:
                     modelo += res_int[z,p,t] <= viaje_int[z,p,t] * 14
                     modelo += res_comp[z,p,t] <= viaje_com[z,p,t] * 14
+                    modelo += res_comp[z,p,t] >= MinCompra * compra_res[z,t]
 
         for p in Planta_S:
             for t in Semana:
                 modelo += (lpSum(res_int[z,p,t] for z in Zona) + lpSum(res_comp[z,p,t] for z in Zona)) <= viaje_envigado[p,t] * 84
-
+                
         # Resolver el modelo
         modelo.solve(PULP_CBC_CMD(timeLimit=180))
         
@@ -249,6 +251,7 @@ with st.sidebar:
     st.header("Configuración del Modelo")
     uploaded_file = st.file_uploader("Cargar archivo Excel con parámetros", type=['xlsx', 'xls'])
     valor_kg = st.number_input("Valor comercial de Kg de carne ($)", min_value=0.0, value=22000.0, step=1000.0)
+    MinCompra = st.number_input("Cantidad mínima viable para compra de reses", min_value=0.0, value=14, step=1)
         
     if uploaded_file is not None:
         st.success("Archivo cargado correctamente")
@@ -283,7 +286,7 @@ if uploaded_file is not None:
         if st.button("Ejecutar Modelo de Optimización"):
             with st.spinner("Ejecutando modelo, por favor espere..."):
                 start_time = time.time()
-                modelo, contexto, costos = ejecutar_modelo(current_data, valor_kg)
+                modelo, contexto, costos = ejecutar_modelo(current_data, valor_kg, MinCompra)
                 execution_time = time.time() - start_time
             
             if modelo is not None and costos is not None:
@@ -1095,6 +1098,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
