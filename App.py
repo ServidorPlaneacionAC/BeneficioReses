@@ -86,6 +86,33 @@ def crear_diccionario(df, columnas_clave, columna_valor):
         valor = row[columna_valor]
         diccionario[clave] = valor
     return diccionario
+def crear_diccionario_rdto_total(inputs_opt_res):
+    # Obtener DataFrames
+    df_merma_tte = inputs_opt_res['MermaTTE'].copy()
+    df_mermas_plantas = inputs_opt_res['MermasPlantas'].copy()
+    
+    # Fusionar los DataFrames
+    df_merged = pd.merge(
+        df_merma_tte,
+        df_mermas_plantas[['PLANTA', 'M_CANAL_CALIENTE', 'M_CANAL_FRIO']],
+        on='PLANTA',
+        how='left'
+    )
+    
+    # Calcular rendimiento total
+    df_merged['RENDIMIENTO'] = 1- (
+        df_merged['MERMA'] + 
+        df_merged['M_CANAL_CALIENTE'].fillna(0) + 
+        df_merged['M_CANAL_FRIO'].fillna(0)
+    )
+    
+    # Crear diccionario
+    rdto_total = dict(zip(
+        zip(df_merged['ZONA'], df_merged['PLANTA']),
+        df_merged['RENDIMIENTO']
+    ))
+    
+    return rdto_total
 
 # Función principal del modelo
 def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
@@ -106,7 +133,10 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
         Capacidad = crear_diccionario(inputs_opt_res['Cap_Planta'], ['PLANTA'], 'CAP_PLANTA')
         Precio_Int = crear_diccionario(inputs_opt_res['CR_INTEGRADA'], ['ZONA'], 'CR_INTEGRADA')
         Precio_Comp = crear_diccionario(inputs_opt_res['CR_COMPRADA'], ['ZONA'], 'CR_COMPRADA')
-        rdto = crear_diccionario(inputs_opt_res['RENDIMIENTO'], ['ZONA','PLANTA'], 'RDTO')
+        # mermatte = crear_diccionario(inputs_opt_res['MermaTTE'], ['ZONA','PLANTA'], 'MERMA')
+        # mermacaliente = crear_diccionario(inputs_opt_res['MermasPlantas'], ['PLANTA'], 'M_CANAL_CALIENTE')
+        # mermasfrio = crear_diccionario(inputs_opt_res['MermasPlantas'], ['PLANTA'], 'M_CANAL_FRIO')
+        rdto = crear_diccionario_rdto_total(inputs_opt_res)
         Precio_Kg = crear_diccionario(inputs_opt_res['PRECIOKG'], ['ZONA'], 'PRECIO')
         Peso_Res = crear_diccionario(inputs_opt_res['PESORES'], ['ZONA'], 'PESO')
 
@@ -1098,6 +1128,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
