@@ -149,7 +149,7 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
         viaje_int = LpVariable.dicts('viaje_Int_zona', [(z,p,t) for z in Zona for p in Planta_S for t in Semana], lowBound=0, cat='Integer')
         viaje_com = LpVariable.dicts('viaje_Com_zona', [(z,p,t) for z in Zona for p in Planta_S for t in Semana], lowBound=0, cat='Integer')
         viaje_envigado = LpVariable.dicts('viaje_envigado', [(p,t) for p in Planta_S for t in Semana], lowBound=0, cat='Integer')
-        compra_res = LpVariable.dicts('compra_res',[(z,t) for z in Zona for t in Semana],cat='Binary')
+        compra_res = LpVariable.dicts('compra_res',[(z,p,t) for z in Zona for p in Planta_S for t in Semana],cat='Binary')
 
         # Función objetivo
         modelo += lpSum(
@@ -173,7 +173,7 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
         for z in Zona:
             for t in Semana:
                 modelo += lpSum(res_int[z,p,t] for p in Planta_S) <= Oferta_Int.get((z,t),0)
-                modelo += lpSum(res_comp[z,p,t] for p in Planta_S) <= Oferta_Com.get((z,t),0) * compra_res[z,t]
+                modelo += lpSum(res_comp[z,p,t] for p in Planta_S) <= Oferta_Com.get((z,t),0)
 
         for p in Planta_S:
             for t in Semana:
@@ -184,7 +184,8 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
                 for t in Semana:
                     modelo += res_int[z,p,t] <= viaje_int[z,p,t] * 14
                     modelo += res_comp[z,p,t] <= viaje_com[z,p,t] * 14
-                    modelo += res_comp[z,p,t] >= MinCompra * compra_res[z,t]
+                    modelo += res_comp[z,p,t] >= MinCompra * compra_res[z,p,t]
+                    modelo += res_comp[z,p,t] <= 1000 * compra_res[z,p,t]
 
         for p in Planta_S:
             for t in Semana:
@@ -1128,6 +1129,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
