@@ -139,7 +139,8 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
         rdto = crear_diccionario_rdto_total(inputs_opt_res)
         Precio_Kg = crear_diccionario(inputs_opt_res['PRECIOKG'], ['ZONA'], 'PRECIO')
         Peso_Res = crear_diccionario(inputs_opt_res['PESORES'], ['ZONA'], 'PESO')
-
+        costo_f = crear_diccionario(inputs_opt_res['COSTO_F'], ['PLANTA'], 'COSTO_F')
+        
         # Creación del modelo
         modelo = LpProblem("CostoSacrificio", LpMaximize)
 
@@ -1137,6 +1138,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
