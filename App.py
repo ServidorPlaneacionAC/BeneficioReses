@@ -805,7 +805,7 @@ if uploaded_file is not None:
                                 if not df_planta.empty:
                                     st.subheader(f"Resumen Planta {planta_seleccionada}")
                                     
-                                        c1, c2, c3, = st.columns(3)
+                                        c1, c2, c3 = st.columns(3)
                                         total_reses = df_planta['Reses Int'].sum() + df_planta['Reses Comp'].sum()
                                         total_costo_reses = df_planta['Costo Int ($)'].sum() + df_planta['Costo Comp ($)'].sum()
                                         total_costo_sacrificio = df_planta['Costo Sac Int ($)'].sum() + df_planta['Costo Sac Comp ($)'].sum()
@@ -1137,6 +1137,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
