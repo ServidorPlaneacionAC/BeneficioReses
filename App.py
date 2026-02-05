@@ -804,20 +804,19 @@ if uploaded_file is not None:
                                 
                                 if not df_planta.empty:
                                     st.subheader(f"Resumen Planta {planta_seleccionada}")
-                                    c1, c2, c3, = st.columns(3)
-                                    total_integradas = df_planta['Reses Int'].sum() + df_planta['Reses Comp'].sum()
-                                    total_costo_reses = df_planta['Costo Int ($)'].sum() + df_planta['Costo Comp ($)'].sum()
-                                    total_costo_sacrificio = df_planta['Costo Sac Int ($)'].sum() + df_planta['Costo Sac Comp ($)'].sum()
-                                    with col_a:
-                                        metrica_personalizada("Reses Integradas", f"{total_integradas:,.0f}")
-                            
-                                    with col_b:
-                                        metrica_personalizada("Reses Compradas", f"{total_costo_reses:,.0f}")
-                            
-                                    with col_c:
-                                        metrica_personalizada("Costo Total Reses", f"${total_costo_sacrificio:,.0f}")
                                     
-    
+                                        c1, c2, c3, = st.columns(3)
+                                        total_reses = df_planta['Reses Int'].sum() + df_planta['Reses Comp'].sum()
+                                        total_costo_reses = df_planta['Costo Int ($)'].sum() + df_planta['Costo Comp ($)'].sum()
+                                        total_costo_sacrificio = df_planta['Costo Sac Int ($)'].sum() + df_planta['Costo Sac Comp ($)'].sum()
+                                        with col_a:
+                                            metrica_personalizada("Reses sacrificadas", f"{total_reses:,.0f}")
+                                
+                                        with col_b:
+                                            metrica_personalizada("Costo de reses", f"{total_costo_reses:,.0f}")
+                                
+                                        with col_c:
+                                            metrica_personalizada("Costo de sacrificio", f"${total_costo_sacrificio:,.0f}")
                                     st.subheader(f"📊 Unidades - {planta_seleccionada}")
                                     st.dataframe(generar_tabla_semanas_filas(df_planta, "Unidades"), use_container_width=True)
                                     
@@ -1138,6 +1137,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
