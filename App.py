@@ -101,10 +101,10 @@ def crear_diccionario_rdto_total(inputs_opt_res):
     
     # Calcular rendimiento total
     df_merged['RENDIMIENTO'] = (
-        df_merged['MERMA'] + 
-        df_merged['M_CANAL_CALIENTE'].fillna(0) + 
-        df_merged['M_CANAL_FRIO'].fillna(0)
-    )
+        (1 - df_merged['MERMA']) * 
+        (1 - df_merged['M_CANAL_CALIENTE'].fillna(0)) * 
+        (1 - df_merged['M_CANAL_FRIO'].fillna(0))
+    ) - 1
     
     # Crear diccionario
     rdto_total = dict(zip(
@@ -126,7 +126,9 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
         Demanda = crear_diccionario(inputs_opt_res['Demanda'], ['SEMANA'], 'DEMANDA')
         Oferta_Int = crear_diccionario(inputs_opt_res['Oferta'], ['ZONA','SEMANA'], 'OFERTA')
         Oferta_Com = crear_diccionario(inputs_opt_res['Compras'], ['ZONA','SEMANA'], 'DISPONIBLE')
-        Costo_Sac = crear_diccionario(inputs_opt_res['CV_PDN'], ['PLANTA'], 'CV_PDN')
+        Precio_Sac = crear_diccionario(inputs_opt_res['CV_PDN'], ['PLANTA'], 'CV_PDN')
+        Retoma_Sac = crear_diccionario(inputs_opt_res['CV_PDN'], ['PLANTA'], 'RETOMAS')
+        Costo_Sac = {k: Precio_Sac[k] - Retoma_Sac[k] for k in Precio_Sac}
         Costo_Viaje_Int = crear_diccionario(inputs_opt_res['CTransporteZF'], ['ZONA','PLANTA'], 'C_TRANS_ZF')
         Costo_Viaje_Comp = crear_diccionario(inputs_opt_res['CTransporteZFC'], ['ZONA','PLANTA'], 'C_TRANS_ZF')
         Costo_Tans_PT = crear_diccionario(inputs_opt_res['CTransporteE'], ['PLANTA'], 'C_TRANS_E')
@@ -1138,6 +1140,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
