@@ -597,7 +597,7 @@ if uploaded_file is not None:
                 diff_kg = costo_final_kg_opt - costo_final_kg_agua
                 pct_kg = (diff_kg / costo_final_kg_agua) if costo_final_kg_agua != 0 else 0
                 data_unificada.append({
-                    'Concepto': 'Costo Final por Kg (Inc. Fijo)', 
+                    'Concepto': 'Costo Final por Kg (con costo fijo planta Aguachica)', 
                     'Escenario Óptimo': costo_final_kg_opt * -1,  # Visualmente negativo
                     'Escenario Aguachica': costo_final_kg_agua * -1, 
                     'Diferencia ($)': diff_kg, 
@@ -1214,3 +1214,4 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
