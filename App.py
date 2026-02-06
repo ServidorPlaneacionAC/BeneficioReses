@@ -100,11 +100,11 @@ def crear_diccionario_rdto_total(inputs_opt_res):
     )
     
     # Calcular rendimiento total
-    df_merged['RENDIMIENTO'] = (
+    df_merged['RENDIMIENTO'] = 1 - (
         (1 - df_merged['MERMA']) * 
         (1 - df_merged['M_CANAL_CALIENTE'].fillna(0)) * 
         (1 - df_merged['M_CANAL_FRIO'].fillna(0))
-    ) - 1
+    )
     
     # Crear diccionario
     rdto_total = dict(zip(
@@ -1140,6 +1140,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
