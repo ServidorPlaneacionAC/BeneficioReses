@@ -273,6 +273,28 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
             'Valorización Total': val_valorizacion  # <--- Aquí está la corrección clave
         }
         # -----------------------------------------------------------
+        
+        # 1. Total Kilos producidos (Ingreso Total / Precio Venta)
+        total_kg_producidos = val_carne / valor_kg if valor_kg > 0 else 0
+        
+        # 2. Total Costo Fijo (Solo plantas usadas * Numero de Semanas)
+        plantas_usadas = set()
+        for z in Zona:
+            for p in Planta_S:
+                for t in Semana:
+                    # Si se envió alguna res (integrada o comprada) a esa planta, se marca como usada
+                    if (res_int[z,p,t].varValue or 0) > 0 or (res_comp[z,p,t].varValue or 0) > 0:
+                        plantas_usadas.add(p)
+        
+        num_semanas = len(Semana)
+        # Sumamos el costo fijo semanal de cada planta usada y lo multiplicamos por las semanas
+        total_costo_fijo = sum(costo_f.get(p, 0) * num_semanas for p in plantas_usadas)
+        
+        # Guardar estos datos en 'KPIs' para usarlos luego en la tabla comparativa
+        contexto['KPIs'] = {
+            'Total Kg': total_kg_producidos,
+            'Total Costo Fijo': total_costo_fijo
+        }
 
         return modelo, contexto, costos
         
@@ -418,6 +440,7 @@ if uploaded_file is not None:
                     'Valor Carne': 0
                 }
                 
+                
                 # Estructuras para agrupar volumenes totales por (Zona, Semana)
                 # Separamos Integradas vs Compradas por si tienen contratos de flete distintos
                 volumen_int = {}   # Clave: (zona, semana) -> Valor: cantidad_total
@@ -502,6 +525,15 @@ if uploaded_file is not None:
                 # Finalizar totales
                 costos_totales = sum([v for k, v in acumuladores.items() if 'Costo' in k])
                 acumuladores['Valorización Total'] = acumuladores['Valor Carne'] - costos_totales
+
+                # Costo Fijo (Solo Aguachica * Semanas)
+                # Aquí no verificamos si se usa o no, porque forzamos el envío a Aguachica
+                num_semanas = len(contexto['Semana'])
+                total_costo_fijo = P['Costo_F'].get(planta_objetivo, 0) * num_semanas
+                
+                # Guardar KPIs en el diccionario de retorno
+                acumuladores['Total Kg'] = total_kg_producidos
+                acumuladores['Total Costo Fijo'] = total_costo_fijo
                 
                 return acumuladores
 
@@ -512,24 +544,35 @@ if uploaded_file is not None:
             # 1. Ejecutar el cálculo del escenario hipotético
             escenario_b = calcular_escenario_hipotetico_detallado(contexto, "AGUACHICA")
 
+            # --- COMPARATIVO DE ESCENARIOS (CON COSTO FINAL POR KG) ---
+            escenario_b = calcular_escenario_hipotetico_detallado(contexto, "AGUACHICA")
             if escenario_b:
                 st.markdown("---")
                 st.subheader("⚖️ Comparativo de Escenarios: Óptimo vs. Todo a Aguachica")
                 
-                # 2. Crear DataFrame unificado
-                # Usamos las mismas claves del diccionario 'costos' original
-                filas = list(costos.keys()) 
+                # Datos Escenario Optimo (Recuperamos lo calculado en el modelo)
+                kpis_opt = contexto['KPIs']
+                total_costo_var_opt = costos['Valor Carne'] - costos['Valorización Total']
+                # Costo Total Real = Variables + Fijos
+                total_costo_total_opt = total_costo_var_opt + kpis_opt['Total Costo Fijo']
+                # DIVISIÓN CLAVE: Costo Total / Kilos Totales
+                costo_final_kg_opt = total_costo_total_opt / kpis_opt['Total Kg'] if kpis_opt['Total Kg'] > 0 else 0
                 
+                # Datos Escenario Aguachica (Recuperamos lo calculado en la función hipotética)
+                total_costo_var_agua = escenario_b['Valor Carne'] - escenario_b['Valorización Total']
+                total_costo_total_agua = total_costo_var_agua + escenario_b['Total Costo Fijo']
+                # DIVISIÓN CLAVE
+                costo_final_kg_agua = total_costo_total_agua / escenario_b['Total Kg'] if escenario_b['Total Kg'] > 0 else 0
+
                 data_unificada = []
-                for concepto in filas:
+                # Filas normales (Variables)
+                for concepto in list(costos.keys()):
                     val_opt = costos[concepto]
                     val_agua = escenario_b.get(concepto, 0)
-                    
-                    # Calcular diferencia y porcentaje (Usamos valores absolutos para la lógica matemática)
                     diff = val_opt - val_agua
                     pct = (diff / val_agua) if val_agua != 0 else 0.0
                     
-                    # AJUSTE VISUAL: Si es costo, multiplicamos por -1 para mostrar negativo
+                    # Visual: Costos negativos para que se vea como egreso
                     es_costo = 'Costo' in concepto
                     val_opt_visual = val_opt * -1 if es_costo else val_opt
                     val_agua_visual = val_agua * -1 if es_costo else val_agua
@@ -542,9 +585,19 @@ if uploaded_file is not None:
                         'Var. (%)': pct
                     })
                 
+                # --- AGREGAR LA FILA FINAL A LA TABLA ---
+                diff_kg = costo_final_kg_opt - costo_final_kg_agua
+                pct_kg = (diff_kg / costo_final_kg_agua) if costo_final_kg_agua != 0 else 0
+                data_unificada.append({
+                    'Concepto': 'Costo Final por Kg (Inc. Fijo)', 
+                    'Escenario Óptimo': costo_final_kg_opt * -1,  # Visualmente negativo
+                    'Escenario Aguachica': costo_final_kg_agua * -1, 
+                    'Diferencia ($)': diff_kg, 
+                    'Var. (%)': pct_kg
+                })
+                
                 df_comparativo = pd.DataFrame(data_unificada)
 
-                # Estilos visuales
                 def estilo_comparativo_final(df_styler):
                     styler = df_styler.format({
                         'Escenario Óptimo': '${:,.0f}',
@@ -553,30 +606,24 @@ if uploaded_file is not None:
                         'Var. (%)': '{:.2%}'
                     })
                     
-                    # Colores para la variación
                     def color_var(val, concepto):
                         if 'Valorización' in concepto or 'Valor Carne' in concepto:
                             color = '#2ca02c' if val > 0 else '#d62728'
                         else:
+                            # Para costos: si dif es negativa (Opt < Agua), es bueno (Verde)
                             color = '#2ca02c' if val < 0 else '#d62728'
                         return f'color: {color}; font-weight: bold'
 
                     styler.apply(lambda x: [color_var(x['Var. (%)'], x['Concepto']) if col == 'Var. (%)' else '' for col in x.index], axis=1)
-                    
-                    # Negrita a la fila de Valorización Total
                     styler.apply(lambda x: ['background-color: #f0f0f0; font-weight: bold' if x['Concepto'] == 'Valorización Total' else '' for _ in x], axis=1)
-                    
+                    # Resaltar la fila nueva de Costo por Kg
+                    styler.apply(lambda x: ['background-color: #e6f3ff; font-weight: bold; border-top: 2px solid #000' if 'Costo Final' in x['Concepto'] else '' for _ in x], axis=1)
                     return styler
 
                 st.dataframe(estilo_comparativo_final(df_comparativo.style), use_container_width=True)
                 
-                # Métrica resumen
-                val_opt_total = costos['Valorización Total']
-                val_agua_total = escenario_b['Valorización Total']
-                mejora = val_opt_total - val_agua_total
-                
+                mejora = costos['Valorización Total'] - escenario_b['Valorización Total']
                 st.info(f"💡 **Análisis:** La optimización genera un beneficio adicional de **${mejora:,.0f}** comparado con enviar todo a Aguachica.")
-                
             else:
                 st.warning("No se pudo calcular el escenario de Aguachica. Verifique que la planta exista en los parámetros.")
             # ------------------------------------------------------------
@@ -1140,6 +1187,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
