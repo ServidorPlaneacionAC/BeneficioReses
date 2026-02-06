@@ -3,7 +3,7 @@ import pandas as pd
 from pulp import *
 from io import BytesIO
 import time
-import matplotlib
+import math # Necesario para calculos matematicos
 
 # Configuración de la página
 st.set_page_config(page_title="Modelo de Sacrificio de Reses", layout="wide")
@@ -86,6 +86,7 @@ def crear_diccionario(df, columnas_clave, columna_valor):
         valor = row[columna_valor]
         diccionario[clave] = valor
     return diccionario
+
 def crear_diccionario_rdto_total(inputs_opt_res):
     # Obtener DataFrames
     df_merma_tte = inputs_opt_res['MermaTTE'].copy()
@@ -101,9 +102,7 @@ def crear_diccionario_rdto_total(inputs_opt_res):
     
     # Calcular rendimiento total
     df_merged['RENDIMIENTO'] = 1 - (
-        (1 - df_merged['MERMA']) * 
-        (1 - df_merged['M_CANAL_CALIENTE'].fillna(0)) * 
-        (1 - df_merged['M_CANAL_FRIO'].fillna(0))
+        (1 - df_merged['MERMA']) * (1 - df_merged['M_CANAL_CALIENTE'].fillna(0)) * (1 - df_merged['M_CANAL_FRIO'].fillna(0))
     )
     
     # Crear diccionario
@@ -171,7 +170,7 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
         # Restricciones
         for t in Semana:
             modelo += (lpSum(res_int[z,p,t] for z in Zona for p in Planta_S) + 
-                      lpSum(res_comp[z,p,t] for z in Zona for p in Planta_S)) == Demanda[t]
+                       lpSum(res_comp[z,p,t] for z in Zona for p in Planta_S)) == Demanda[t]
 
         for z in Zona:
             for t in Semana:
@@ -224,35 +223,36 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
                 'Demanda': Demanda,
                 'Oferta_Int': Oferta_Int,
                 'Oferta_Com': Oferta_Com,
-                'Capacidad': Capacidad
+                'Capacidad': Capacidad,
+                'Costo_F': costo_f  # Costos Fijos Agregados
             }
         }
         
         # Calcular métricas de costos
         # --- BLOQUE CORREGIDO PARA CALCULAR COSTOS ---
         # 1. Calcular cada componente por separado para asegurar precisión
-        val_costo_int = sum(res_int[z,p,t].varValue * Precio_Int.get((z),0) 
+        val_costo_int = sum((res_int[z,p,t].varValue or 0) * Precio_Int.get((z),0) 
                             for z in Zona for p in Planta_S for t in Semana)
         
-        val_costo_comp = sum(res_comp[z,p,t].varValue * Precio_Comp.get((z),0) 
+        val_costo_comp = sum((res_comp[z,p,t].varValue or 0) * Precio_Comp.get((z),0) 
                              for z in Zona for p in Planta_S for t in Semana)
         
-        val_costo_sac = (sum(res_int[z,p,t].varValue * Costo_Sac.get((p),0) 
+        val_costo_sac = (sum(((res_int[z,p,t].varValue or 0) * Costo_Sac.get((p),0))
                              for z in Zona for p in Planta_S for t in Semana) +
-                         sum(res_comp[z,p,t].varValue * Costo_Sac.get((p),0) 
+                         sum(((res_comp[z,p,t].varValue or 0) * Costo_Sac.get((p),0))
                              for z in Zona for p in Planta_S for t in Semana))
         
-        val_costo_tte_res = (sum(viaje_int[z,p,t].varValue * Costo_Viaje_Int.get((z,p),0) 
+        val_costo_tte_res = (sum(((viaje_int[z,p,t].varValue or 0) * Costo_Viaje_Int.get((z,p),0))
                                  for z in Zona for p in Planta_S for t in Semana) +
-                             sum(viaje_com[z,p,t].varValue * Costo_Viaje_Comp.get((z,p),0) 
+                             sum(((viaje_com[z,p,t].varValue or 0) * Costo_Viaje_Comp.get((z,p),0))
                                  for z in Zona for p in Planta_S for t in Semana))
         
-        val_costo_tte_pt = sum(viaje_envigado[p,t].varValue * Costo_Tans_PT.get((p),0) 
+        val_costo_tte_pt = sum((viaje_envigado[p,t].varValue or 0) * Costo_Tans_PT.get((p),0) 
                                for p in Planta_S for t in Semana)
         
-        val_carne = (sum(res_int[z,p,t].varValue * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg 
+        val_carne = (sum(((res_int[z,p,t].varValue or 0) * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg)
                          for z in Zona for p in Planta_S for t in Semana) +
-                     sum(res_comp[z,p,t].varValue * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg 
+                     sum(((res_comp[z,p,t].varValue or 0) * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg)
                          for z in Zona for p in Planta_S for t in Semana))
 
         # 2. Calcular la Valorización Total como una RESTA simple (Ingreso - Costos)
@@ -274,6 +274,7 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
         }
         # -----------------------------------------------------------
         
+        # --- CALCULO DE KPIs PARA EL COSTO POR KG (NO AFECTA EL MODELO) ---
         # 1. Total Kilos producidos (Ingreso Total / Precio Venta)
         total_kg_producidos = val_carne / valor_kg if valor_kg > 0 else 0
         
@@ -440,23 +441,26 @@ if uploaded_file is not None:
                     'Valor Carne': 0
                 }
                 
-                
                 # Estructuras para agrupar volumenes totales por (Zona, Semana)
                 # Separamos Integradas vs Compradas por si tienen contratos de flete distintos
                 volumen_int = {}   # Clave: (zona, semana) -> Valor: cantidad_total
                 volumen_comp = {}  # Clave: (zona, semana) -> Valor: cantidad_total
                 
                 total_reses_procesadas = 0
+                total_kg_producidos = 0
                 
-                # Parametros
-                P_Int = contexto['parametros']['Precio_Int']
-                P_Comp = contexto['parametros']['Precio_Comp']
-                C_Viaje_Int = contexto['parametros']['Costo_Viaje_Int']
-                C_Viaje_Comp = contexto['parametros']['Costo_Viaje_Comp']
-                C_Sac = contexto['parametros']['Costo_Sac']
-                Peso = contexto['parametros']['Peso_Res']
-                Rendimiento = contexto['parametros']['rdto']
-                Val_Kg = contexto['parametros']['valor_kg']
+                # Definir P explícitamente para acceder a los parametros
+                P = contexto['parametros']
+                
+                # Parametros directos
+                P_Int = P['Precio_Int']
+                P_Comp = P['Precio_Comp']
+                C_Viaje_Int = P['Costo_Viaje_Int']
+                C_Viaje_Comp = P['Costo_Viaje_Comp']
+                C_Sac = P['Costo_Sac']
+                Peso = P['Peso_Res']
+                Rendimiento = P['rdto']
+                Val_Kg = P['valor_kg']
                 
                 if planta_objetivo not in C_Sac: return None
 
@@ -475,7 +479,9 @@ if uploaded_file is not None:
                         acumuladores['Costo Sacrificio'] += qty * C_Sac.get(planta_objetivo, 0)
                         
                         rdto_agua = Rendimiento.get((z, planta_objetivo), 0)
-                        acumuladores['Valor Carne'] += qty * Peso.get(z, 0) * rdto_agua * Val_Kg
+                        kg_carne = qty * Peso.get(z, 0) * rdto_agua
+                        acumuladores['Valor Carne'] += kg_carne * Val_Kg
+                        total_kg_producidos += kg_carne
                         
                         # Agrupar volumen para calcular camiones después
                         if (z, t) not in volumen_int: volumen_int[(z, t)] = 0
@@ -492,7 +498,9 @@ if uploaded_file is not None:
                         acumuladores['Costo Sacrificio'] += qty * C_Sac.get(planta_objetivo, 0)
                         
                         rdto_agua = Rendimiento.get((z, planta_objetivo), 0)
-                        acumuladores['Valor Carne'] += qty * Peso.get(z, 0) * rdto_agua * Val_Kg
+                        kg_carne = qty * Peso.get(z, 0) * rdto_agua
+                        acumuladores['Valor Carne'] += kg_carne * Val_Kg
+                        total_kg_producidos += kg_carne
                         
                         # Agrupar volumen
                         if (z, t) not in volumen_comp: volumen_comp[(z, t)] = 0
@@ -525,13 +533,14 @@ if uploaded_file is not None:
                 # Finalizar totales
                 costos_totales = sum([v for k, v in acumuladores.items() if 'Costo' in k])
                 acumuladores['Valorización Total'] = acumuladores['Valor Carne'] - costos_totales
-
-                # Costo Fijo (Solo Aguachica * Semanas)
-                # Aquí no verificamos si se usa o no, porque forzamos el envío a Aguachica
-                num_semanas = len(contexto['Semana'])
-                total_costo_fijo = P['Costo_F'].get(planta_objetivo, 0) * num_semanas
                 
-                # Guardar KPIs en el diccionario de retorno
+                # Costo Fijo (Solo Aguachica * Semanas)
+                num_semanas = len(contexto['Semana'])
+                # Usamos .get para evitar errores si no existe Costo_F en datos viejos
+                costos_fijos_dict = P.get('Costo_F', {})
+                total_costo_fijo = costos_fijos_dict.get(planta_objetivo, 0) * num_semanas
+                
+                # Guardar KPIs
                 acumuladores['Total Kg'] = total_kg_producidos
                 acumuladores['Total Costo Fijo'] = total_costo_fijo
                 
@@ -545,13 +554,12 @@ if uploaded_file is not None:
             escenario_b = calcular_escenario_hipotetico_detallado(contexto, "AGUACHICA")
 
             # --- COMPARATIVO DE ESCENARIOS (CON COSTO FINAL POR KG) ---
-            escenario_b = calcular_escenario_hipotetico_detallado(contexto, "AGUACHICA")
             if escenario_b:
                 st.markdown("---")
                 st.subheader("⚖️ Comparativo de Escenarios: Óptimo vs. Todo a Aguachica")
                 
                 # Datos Escenario Optimo (Recuperamos lo calculado en el modelo)
-                kpis_opt = contexto['KPIs']
+                kpis_opt = contexto.get('KPIs', {'Total Kg': 0, 'Total Costo Fijo': 0})
                 total_costo_var_opt = costos['Valor Carne'] - costos['Valorización Total']
                 # Costo Total Real = Variables + Fijos
                 total_costo_total_opt = total_costo_var_opt + kpis_opt['Total Costo Fijo']
@@ -712,7 +720,7 @@ if uploaded_file is not None:
                                         'Costo Sac Comp ($)': round(costo_sac_comp, 2),
                                         'Ingreso Int ($)': round(ingreso_int, 2),
                                         'Ingreso Comp ($)': round(ingreso_comp, 2)
-                                    })                     
+                                    })                      
                         if zona_data:
                             df_zona = pd.DataFrame(zona_data)
                             
@@ -823,12 +831,12 @@ if uploaded_file is not None:
                                             if row.name == 'TOTAL':
                                                 return ['font-weight: bold; border-top: 2px solid black; background-color: #e6e6e6; color: black'] * len(row)
                                             return [''] * len(row)
-                            
+                                        
                                         # Aplicar a todas las filas (axis=1), la lógica interna filtra 'TOTAL'
                                         styler.apply(highlight_total_row, axis=1)
                                         
                                         return styler
-                            
+                                    
                                     return estilo_financiero_columnas(df_view.style)
     
                             # --- Visualización ---
@@ -861,10 +869,10 @@ if uploaded_file is not None:
                                     total_costo_sacrificio = df_planta['Costo Sac Int ($)'].sum() + df_planta['Costo Sac Comp ($)'].sum()
                                     with c1:
                                         metrica_personalizada("Reses sacrificadas", f"{total_reses:,.0f}")
-                            
+                                    
                                     with c2:
                                         metrica_personalizada("Costo de reses", f"{total_costo_reses:,.0f}")
-                            
+                                    
                                     with c3:
                                         metrica_personalizada("Costo de sacrificio", f"${total_costo_sacrificio:,.0f}")
                                     st.subheader(f"📊 Unidades - {planta_seleccionada}")
@@ -1087,6 +1095,7 @@ with st.expander("Descargar plantilla de Excel"):
     - **Compras**: Disponibilidad de reses a comprar por zona y semana
     - **Demanda**: Demanda semanal de reses
     - **CV_PDN**: Costo variable de sacrificio por planta
+    - **COSTO_F**: Costo fijo semanal por planta
     - **CTransporteZF**: Costo de transporte de reses integradas
     - **CTransporteZFC**: Costo de transporte de reses compradas
     - **CTransporteE**: Costo de transporte de canales
@@ -1101,7 +1110,7 @@ with st.expander("Descargar plantilla de Excel"):
     # Crear archivo Excel de ejemplo en memoria
     output = BytesIO()
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
-       
+        
         Zonas = ['ANTIOQUIA','VALLEDUPAR','COSTA','MAGDALENA MEDIO', 'LLANOS', 'SUR DEL CESAR', 'MAGDALENA MEDIO NORTE']
         Semanas = ['27.2025', '28.2025', '29.2025', '30.2025']
         Plantas = ['AGUACHICA','FRIGOSINU','CENTRAL GANADERA','FRIOGAN DORADA','COROZAL']
@@ -1121,8 +1130,15 @@ with st.expander("Descargar plantilla de Excel"):
         # Hoja de ejemplo para CV_PDN
         pd.DataFrame({
             'PLANTA': Plantas,
-            'CV_PDN': 130000
+            'CV_PDN': 130000,
+            'RETOMAS': 1000
         }).to_excel(writer, sheet_name='CV_PDN', index=False)
+
+        # Hoja de ejemplo para COSTO_F (NUEVA)
+        pd.DataFrame({
+            'PLANTA': Plantas,
+            'COSTO_F_SEM': 50000000
+        }).to_excel(writer, sheet_name='COSTO_F', index=False)
         
         # Hoja de ejemplo para Costos de transporte de zonas a plantas integradas
         pd.DataFrame({
@@ -1130,13 +1146,24 @@ with st.expander("Descargar plantilla de Excel"):
             'PLANTA': Plantas * len(Zonas),
             'C_TRANS_ZF': 1200000
         }).to_excel(writer, sheet_name='CTransporteZF', index=False)
-        
-        # Hoja de ejemplo para RENDIMIENTO
+
+        # Hojas de ejemplo para Mermas (Necesarias para crear_diccionario_rdto_total)
         pd.DataFrame({
             'ZONA': [zona for zona in Zonas for _ in Plantas],
             'PLANTA': Plantas * len(Zonas),
-            'RDTO': 0.55
-        }).to_excel(writer, sheet_name='RENDIMIENTO', index=False)
+            'MERMA': 0.02
+        }).to_excel(writer, sheet_name='MermaTTE', index=False)
+
+        pd.DataFrame({
+            'PLANTA': Plantas,
+            'M_CANAL_CALIENTE': 0.01,
+            'M_CANAL_FRIO': 0.01
+        }).to_excel(writer, sheet_name='MermasPlantas', index=False)
+        
+        # Hoja de ejemplo para RENDIMIENTO (Aunque se calcula, a veces se usa como fallback o input directo en versiones simples, pero aquí se usa la funcion compleja. Dejamos una hoja dummy si se requiere o input directo)
+        # En tu código usas crear_diccionario_rdto_total que lee MermaTTE y MermasPlantas.
+        # Pero el código original que pasaste también tenía una hoja RENDIMIENTO en la descripción.
+        
         # Hoja de ejemplo para Diponibilidad de compra
         pd.DataFrame({
             'ZONA': [zona for zona in Zonas for _ in Semanas],
@@ -1173,12 +1200,12 @@ with st.expander("Descargar plantilla de Excel"):
         pd.DataFrame({
             'ZONA': Zonas,
             'PRECIO': 2500000
-        }).to_excel(writer,sheet_name='CR_CROMPRADA',index=False)
+        }).to_excel(writer,sheet_name='CR_COMPRADA',index=False)
         #Hoja de ejemplo para el Costo de reses integradas en cada zona
         pd.DataFrame({
             'ZONA': Zonas,
             'PRECIO': 1500000
-        }).to_excel(writer,sheet_name='CR_INTEGRADA',index=False)     
+        }).to_excel(writer,sheet_name='CR_INTEGRADA',index=False)      
     
     st.download_button(
         label="Descargar plantilla",
@@ -1187,8 +1214,3 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
-
-
-
-
-
