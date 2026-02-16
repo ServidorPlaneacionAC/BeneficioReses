@@ -89,8 +89,8 @@ def crear_diccionario(df, columnas_clave, columna_valor):
 
 def crear_diccionario_rdto_total(inputs_opt_res):
     # Obtener DataFrames
-    df_merma_tte = inputs_opt_res['MermaTTE'].copy()
-    df_mermas_plantas = inputs_opt_res['MermasPlantas'].copy()
+    df_merma_tte = inputs_opt_res['MERMA.TTE.ZONAPLANTA'].copy()
+    df_mermas_plantas = inputs_opt_res['MERMA.PLANTA'].copy()
     
     # Fusionar los DataFrames
     df_merged = pd.merge(
@@ -1208,6 +1208,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
