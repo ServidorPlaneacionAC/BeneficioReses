@@ -1146,7 +1146,7 @@ with st.expander("Descargar plantilla de Excel"):
         pd.DataFrame({
             'PLANTA': Plantas[0],
             'COSTO_F_SEMANAL': 316731916
-        }).to_excel(writer, sheet_name='C.FIJO.AGUACHICA', index=False)
+        }, index=[0]).to_excel(writer, sheet_name='C.FIJO.AGUACHICA', index=False)
         
         # Hoja de ejemplo para Costos de transporte de zonas a plantas reses integradas
         pd.DataFrame({
@@ -1208,5 +1208,6 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
