@@ -77,7 +77,7 @@ def procesar_archivo(uploaded_file):
             # Si esta hoja debe tener 'SEMANA' como texto, convertirla
             if sheet_name in hojas_con_semana and 'SEMANA' in df.columns:
                 # Convertir a string y limpiar posibles decimales
-                df['SEMANA'] = df['SEMANA'].astype(str).strreplace('', '', regex=False)
+                df['SEMANA'] = df['SEMANA'].astype(str).str.replace('', '', regex=False)
             
             dfs[sheet_name] = df
         
@@ -1219,6 +1219,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
