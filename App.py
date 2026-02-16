@@ -117,30 +117,31 @@ def crear_diccionario_rdto_total(inputs_opt_res):
 def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
     try:
         # Definición de conjuntos
-        Zona = list(set(inputs_opt_res['Oferta']['ZONA']))
-        Planta_S = list(set(inputs_opt_res['CV_PDN']['PLANTA']))
-        Semana = list(set(inputs_opt_res['Demanda']['SEMANA']))
+        Zona = list(set(inputs_opt_res['OFT.INTEGRADAS']['ZONA']))
+        Planta_S = list(set(inputs_opt_res['C.VARIABLE.PDN']['PLANTA']))
+        Semana = list(set(inputs_opt_res['DDA.CANALES']['SEMANA']))
 
         # Definición de parámetros
-        Demanda = crear_diccionario(inputs_opt_res['Demanda'], ['SEMANA'], 'DEMANDA')
-        Oferta_Int = crear_diccionario(inputs_opt_res['Oferta'], ['ZONA','SEMANA'], 'OFERTA')
-        Oferta_Com = crear_diccionario(inputs_opt_res['Compras'], ['ZONA','SEMANA'], 'DISPONIBLE')
-        Precio_Sac = crear_diccionario(inputs_opt_res['CV_PDN'], ['PLANTA'], 'CV_PDN')
-        Retoma_Sac = crear_diccionario(inputs_opt_res['CV_PDN'], ['PLANTA'], 'RETOMAS')
+        Demanda = crear_diccionario(inputs_opt_res['DDA.CANALES'], ['SEMANA'], 'DEMANDA')
+        Oferta_Int = crear_diccionario(inputs_opt_res['OFT.INTEGRADAS'], ['ZONA','SEMANA'], 'DISPONIBLE')
+        Oferta_Com = crear_diccionario(inputs_opt_res['OFT.COMPRADAS'], ['ZONA','SEMANA'], 'DISPONIBLE')
+        Precio_Sac = crear_diccionario(inputs_opt_res['C.VARIABLE.PDN'], ['PLANTA'], 'C_BENEFICIO')
+        Retoma_Sac = crear_diccionario(inputs_opt_res['C.VARIABLE.PDN'], ['PLANTA'], 'RETOMAS')
         Costo_Sac = {k: Precio_Sac[k] - Retoma_Sac[k] for k in Precio_Sac}
-        Costo_Viaje_Int = crear_diccionario(inputs_opt_res['CTransporteZF'], ['ZONA','PLANTA'], 'C_TRANS_ZF')
-        Costo_Viaje_Comp = crear_diccionario(inputs_opt_res['CTransporteZFC'], ['ZONA','PLANTA'], 'C_TRANS_ZF')
-        Costo_Tans_PT = crear_diccionario(inputs_opt_res['CTransporteE'], ['PLANTA'], 'C_TRANS_E')
-        Capacidad = crear_diccionario(inputs_opt_res['Cap_Planta'], ['PLANTA'], 'CAP_PLANTA')
-        Precio_Int = crear_diccionario(inputs_opt_res['CR_INTEGRADA'], ['ZONA'], 'CR_INTEGRADA')
-        Precio_Comp = crear_diccionario(inputs_opt_res['CR_COMPRADA'], ['ZONA'], 'CR_COMPRADA')
-        # mermatte = crear_diccionario(inputs_opt_res['MermaTTE'], ['ZONA','PLANTA'], 'MERMA')
-        # mermacaliente = crear_diccionario(inputs_opt_res['MermasPlantas'], ['PLANTA'], 'M_CANAL_CALIENTE')
-        # mermasfrio = crear_diccionario(inputs_opt_res['MermasPlantas'], ['PLANTA'], 'M_CANAL_FRIO')
+        Costo_Viaje_Int = crear_diccionario(inputs_opt_res['C.TTE.INT.ZONAPLANTA'], ['ZONA','PLANTA'], 'C_TRANS_ZONAPLANTA')
+        Costo_Viaje_Comp = crear_diccionario(inputs_opt_res['C.TTE.COMP.ZONAPLANTA'], ['ZONA','PLANTA'], 'C_TRANS_ZONAPLANTA')
+        Costo_Tans_PT = crear_diccionario(inputs_opt_res['C.TTE.ENVIGADO'], ['PLANTA'], 'C_TRANS_ENVIGADO')
+        Capacidad = crear_diccionario(inputs_opt_res['CAP.PLANTA'], ['PLANTA'], 'CAP_PLANTA')
+        Peso_Res = crear_diccionario(inputs_opt_res['PESO.RES'], ['ZONA'], 'PESO')
         rdto = crear_diccionario_rdto_total(inputs_opt_res)
-        Precio_Kg = crear_diccionario(inputs_opt_res['PRECIOKG'], ['ZONA'], 'PRECIO')
-        Peso_Res = crear_diccionario(inputs_opt_res['PESORES'], ['ZONA'], 'PESO')
-        costo_f = crear_diccionario(inputs_opt_res['COSTO_F'], ['PLANTA'], 'COSTO_F_SEM')
+        Precio_Kg_Int = crear_diccionario(inputs_opt_res['PRECIO.KG'], ['ZONA'], 'INTEGRACION')
+        Precio_Kg_comp = crear_diccionario(inputs_opt_res['PRECIO.KG'], ['ZONA'], 'COMPRAS')
+        
+        Precio_Int = {k: Precio_Kg_Int[k] * Peso_Res[k] for k in Precio_Kg_Int}
+        Precio_Comp = {k: Precio_Kg_comp[k] * Peso_Res[k] for k in Precio_Kg_comp}
+        
+
+        costo_f = crear_diccionario(inputs_opt_res['C.FIJO.AGUACHICA'], ['PLANTA'], 'COSTO_F_SEMANAL')
         
         # Creación del modelo
         modelo = LpProblem("CostoSacrificio", LpMaximize)
@@ -1091,20 +1092,19 @@ with st.expander("Descargar plantilla de Excel"):
     Descargue esta plantilla y complétela con sus datos antes de cargarla en la aplicación.
     La plantilla debe contener las siguientes hojas:
     
-    - **Oferta**: Disponibilidad de reses integradas por zona y semana
-    - **Compras**: Disponibilidad de reses a comprar por zona y semana
-    - **Demanda**: Demanda semanal de reses
-    - **CV_PDN**: Costo variable de sacrificio por planta
-    - **COSTO_F**: Costo fijo semanal por planta
-    - **CTransporteZF**: Costo de transporte de reses integradas
-    - **CTransporteZFC**: Costo de transporte de reses compradas
-    - **CTransporteE**: Costo de transporte de canales
-    - **Cap_Planta**: Capacidad de sacrificio por planta
-    - **CR_INTEGRADA**: Valor de reses integradas por zona
-    - **CR_COMPRADA**: Valor de reses compradas por zona
-    - **RENDIMIENTO**: Rendimiento por zona y planta
-    - **PRECIOKG**: Precio por kg por zona
-    - **PESORES**: Peso de res por zona
+    - **OFT.INTEGRADAS**: Disponibilidad de reses integradas por zona y semana.
+    - **OFT.COMPRADAS**: Disponibilidad de reses para comprar por zona y semana.
+    - **DDA.CANALES**: Demanda semanal de reses o canales. 
+    - **C.VARIABLE.PDN**: Costo variable de beneficio en cada planta.
+    - **C.FIJO.AGUACHICA**: Costo fijo semanal de la planta Aguachica.
+    - **C.TTE.INT.ZONAPLANTA**: Costo de transporte de reses integradas desde las zonas a las plantas de beneficio.
+    - **C.TTE.COMP.ZONAPLANTA**: Costo de transporte de reses compradas desde las zonas a las plantas de beneficio.
+    - **C.TTE.ENVIGADO**: Costo de transporte de canales desde cada planta hacia Envigado.
+    - **CAP.PLANTA**: Capacidad semanal de sacrificio por planta.
+    - **PRECIO.KG**: Precio por kg por zona segregado para reses integradas y compradas.
+    - **PESO.RES**: Peso promedio de res por zona.
+    - **MERMA.TTE.ZONAPLANTA**: Merma de transporte para cada zona y planta.
+    - **MERMA.PLANTA**: Mermas de canal caliente y canal frío en cada planta.
     """)
     
     # Crear archivo Excel de ejemplo en memoria
@@ -1112,100 +1112,94 @@ with st.expander("Descargar plantilla de Excel"):
     with pd.ExcelWriter(output, engine='openpyxl') as writer:
         
         Zonas = ['ANTIOQUIA','VALLEDUPAR','COSTA','MAGDALENA MEDIO', 'LLANOS', 'SUR DEL CESAR', 'MAGDALENA MEDIO NORTE']
-        Semanas = ['27.2025', '28.2025', '29.2025', '30.2025']
+        Semanas = ['2026.10', '2026.11', '2026.12', '2026.13']
         Plantas = ['AGUACHICA','FRIGOSINU','CENTRAL GANADERA','FRIOGAN DORADA','COROZAL']
-        # Hoja de ejemplo para Oferta
+        
+        # Hoja de ejemplo para OFT.INTEGRADAS
         pd.DataFrame({
             'ZONA': [zona for zona in Zonas for _ in Semanas],
             'SEMANA': Semanas * len(Zonas),
-            'OFERTA': 25
-        }).to_excel(writer, sheet_name='Oferta', index=False)
+            'DISPONIBLE': 25
+        }).to_excel(writer, sheet_name='OFT.INTEGRADAS', index=False)
+
+        # Hoja de ejemplo para OFT.COMPRADAS
+        pd.DataFrame({
+            'ZONA': [zona for zona in Zonas for _ in Semanas],
+            'SEMANA': Semanas * len(Zonas),
+            'DISPONIBLE': 25
+        }).to_excel(writer, sheet_name='OFT.COMPRADAS', index=False)
         
-        # Hoja de ejemplo para Demanda
+        # Hoja de ejemplo para DDA.CANALES
         pd.DataFrame({
             'SEMANA': Semanas,
             'DEMANDA': 100
-        }).to_excel(writer, sheet_name='Demanda', index=False)
+        }).to_excel(writer, sheet_name='DDA.CANALES', index=False)
         
-        # Hoja de ejemplo para CV_PDN
+        # Hoja de ejemplo para C.VARIABLE.PDN
         pd.DataFrame({
             'PLANTA': Plantas,
-            'CV_PDN': 130000,
+            'C_BENIFICIO': 130000,
             'RETOMAS': 1000
-        }).to_excel(writer, sheet_name='CV_PDN', index=False)
+        }).to_excel(writer, sheet_name='C.VARIABLE.PDN', index=False)
 
-        # Hoja de ejemplo para COSTO_F (NUEVA)
+        # Hoja de ejemplo para C.FIJO.AGUACHICA 
         pd.DataFrame({
-            'PLANTA': Plantas,
-            'COSTO_F_SEM': 50000000
-        }).to_excel(writer, sheet_name='COSTO_F', index=False)
+            'PLANTA': Plantas[0],
+            'COSTO_F_SEMANAL': 316731916
+        }).to_excel(writer, sheet_name='C.FIJO.AGUACHICA', index=False)
         
-        # Hoja de ejemplo para Costos de transporte de zonas a plantas integradas
+        # Hoja de ejemplo para Costos de transporte de zonas a plantas reses integradas
         pd.DataFrame({
             'ZONA': [zona for zona in Zonas for _ in Plantas],
             'PLANTA': Plantas * len(Zonas),
-            'C_TRANS_ZF': 1200000
-        }).to_excel(writer, sheet_name='CTransporteZF', index=False)
+            'C_TRANS_ZONAPLANTA': 1200000
+        }).to_excel(writer, sheet_name='C.TTE.INT.ZONAPLANTA', index=False)
 
+        # Hoja de ejemplo para Costos de transporte de zonas a plantas reses compradas
+        pd.DataFrame({
+            'ZONA': [zona for zona in Zonas for _ in Plantas],
+            'PLANTA': Plantas * len(Zonas),
+            'C_TRANS_ZONAPLANTA': 1200000
+        }).to_excel(writer, sheet_name='C.TTE.COMP.ZONAPLANTA', index=False)
+        
+        # Hoja de ejemplo para Costos de transporte de plantas a Envigado
+        pd.DataFrame({
+            'PLANTA': Plantas,
+            'C_TRANS_ENVIGADO': 4000000
+        }).to_excel(writer, sheet_name='C.TTE.ENVIGADO', index=False) 
+
+        # Hoja de ejemplo para Capacidad de planta
+        pd.DataFrame({
+            'PLANTA': Plantas,
+            'CAP_PLANTA': 50
+        }).to_excel(writer, sheet_name='CAP.PLANTA', index=False) 
+
+        #Hoja de ejemplo para el precio por kg negociado en cada zona
+        pd.DataFrame({
+            'ZONA': Zonas,
+            'COMPRAS': 8000,
+            'INTEGRACION': 8000
+        }).to_excel(writer,sheet_name='PRECIO.KG',index=False)
+
+        #Hoja de ejemplo para el promedio de peso de reses en cada zona
+        pd.DataFrame({
+            'ZONA': Zonas,
+            'PESO': 400
+        }).to_excel(writer,sheet_name='PESO.RES',index=False)
+        
         # Hojas de ejemplo para Mermas (Necesarias para crear_diccionario_rdto_total)
         pd.DataFrame({
             'ZONA': [zona for zona in Zonas for _ in Plantas],
             'PLANTA': Plantas * len(Zonas),
             'MERMA': 0.02
-        }).to_excel(writer, sheet_name='MermaTTE', index=False)
+        }).to_excel(writer, sheet_name='MERMA.TTE.ZONAPLANTA', index=False)
 
         pd.DataFrame({
             'PLANTA': Plantas,
             'M_CANAL_CALIENTE': 0.01,
             'M_CANAL_FRIO': 0.01
-        }).to_excel(writer, sheet_name='MermasPlantas', index=False)
-        
-        # Hoja de ejemplo para RENDIMIENTO (Aunque se calcula, a veces se usa como fallback o input directo en versiones simples, pero aquí se usa la funcion compleja. Dejamos una hoja dummy si se requiere o input directo)
-        # En tu código usas crear_diccionario_rdto_total que lee MermaTTE y MermasPlantas.
-        # Pero el código original que pasaste también tenía una hoja RENDIMIENTO en la descripción.
-        
-        # Hoja de ejemplo para Diponibilidad de compra
-        pd.DataFrame({
-            'ZONA': [zona for zona in Zonas for _ in Semanas],
-            'SEMANA': Semanas * len(Zonas),
-            'DISPONIBLE': 25
-        }).to_excel(writer, sheet_name='Compras', index=False)
-        # Hoja de ejemplo para Capacidad de planta
-        pd.DataFrame({
-            'PLANTA': Plantas,
-            'CAP_PLANTA': 50
-        }).to_excel(writer, sheet_name='Cap_Planta', index=False) 
-        # Hoja de ejemplo para Costos de transporte de zonas a plantas de reses compradas
-        pd.DataFrame({
-            'ZONA': [zona for zona in Zonas for _ in Plantas],
-            'PLANTA': Plantas * len(Zonas),
-            'C_TRANS_ZF': 1200000
-        }).to_excel(writer, sheet_name='CTransporteZFC', index=False)   
-        # Hoja de ejemplo para Costos de transporte de plantas a Envigado
-        pd.DataFrame({
-            'PLANTA': Plantas,
-            'C_TRANS_E': 4000000
-        }).to_excel(writer, sheet_name='CTransporteE', index=False) 
-        #Hoja de ejemplo para el promedio de peso de reses en cada zona
-        pd.DataFrame({
-            'ZONA': Zonas,
-            'PESO': 400
-        }).to_excel(writer,sheet_name='PESORES',index=False)
-        #Hoja de ejemplo para el precio por kg negociado en cada zona
-        pd.DataFrame({
-            'ZONA': Zonas,
-            'PRECIO': 8000
-        }).to_excel(writer,sheet_name='PRECIOKG',index=False)
-        #Hoja de ejemplo para el Costo de reses compradas en cada zona
-        pd.DataFrame({
-            'ZONA': Zonas,
-            'PRECIO': 2500000
-        }).to_excel(writer,sheet_name='CR_COMPRADA',index=False)
-        #Hoja de ejemplo para el Costo de reses integradas en cada zona
-        pd.DataFrame({
-            'ZONA': Zonas,
-            'PRECIO': 1500000
-        }).to_excel(writer,sheet_name='CR_INTEGRADA',index=False)      
+        }).to_excel(writer, sheet_name='MERMA.PLANTA', index=False)
+   
     
     st.download_button(
         label="Descargar plantilla",
@@ -1214,4 +1208,5 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
