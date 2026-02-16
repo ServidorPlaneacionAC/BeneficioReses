@@ -67,8 +67,19 @@ def procesar_archivo(uploaded_file):
         excel_data = pd.ExcelFile(uploaded_file)
         dfs = {}
         
+        # Lista de hojas que contienen la columna 'SEMANA'
+        hojas_con_semana = ['OFT.INTEGRADAS', 'OFT.COMPRADAS', 'DDA.CANALES']
+        
         for sheet_name in excel_data.sheet_names:
-            dfs[sheet_name] = pd.read_excel(excel_data, sheet_name=sheet_name)
+            # Leer la hoja
+            df = pd.read_excel(excel_data, sheet_name=sheet_name)
+            
+            # Si esta hoja debe tener 'SEMANA' como texto, convertirla
+            if sheet_name in hojas_con_semana and 'SEMANA' in df.columns:
+                # Convertir a string y limpiar posibles decimales
+                df['SEMANA'] = df['SEMANA'].astype(str).str.replace('.0', '', regex=False)
+            
+            dfs[sheet_name] = df
         
         return dfs
     except Exception as e:
