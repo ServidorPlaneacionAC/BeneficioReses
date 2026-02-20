@@ -67,25 +67,15 @@ def procesar_archivo(uploaded_file):
         excel_data = pd.ExcelFile(uploaded_file)
         dfs = {}
         
-        # Lista de hojas que contienen la columna 'SEMANA'
-        hojas_con_semana = ['OFT.INTEGRADAS', 'OFT.COMPRADAS', 'DDA.CANALES']
-        
+        # Leemos el Excel de forma natural, para que 'SEMANA' siga siendo numérico (Float)
         for sheet_name in excel_data.sheet_names:
-            # Leer la hoja
-            df = pd.read_excel(excel_data, sheet_name=sheet_name)
+            dfs[sheet_name] = pd.read_excel(excel_data, sheet_name=sheet_name)
             
-            # Si esta hoja debe tener 'SEMANA' como texto, convertirla
-            if sheet_name in hojas_con_semana and 'SEMANA' in df.columns:
-                # Convertir a string y limpiar posibles decimales
-                df['SEMANA'] = df['SEMANA'].astype(str).str.replace('', '', regex=False)
-            
-            dfs[sheet_name] = df
-        
         return dfs
     except Exception as e:
         st.error(f"Error al leer el archivo Excel: {str(e)}")
         return None
-
+        
 # Función para crear diccionarios de parámetros
 def crear_diccionario(df, columnas_clave, columna_valor):
     diccionario = {}
@@ -415,7 +405,7 @@ if uploaded_file is not None:
                 df_consolidado = df_consolidado.sort_values(['Semana', 'Zona', 'Planta'])
                 
                 # Mostrar tabla
-                st.dataframe(df_consolidado)
+                st.dataframe(df_consolidado.style.format({'Semana': '{:.2f}'}))
                 
                 # Opción para descargar
                 output = BytesIO()
@@ -790,7 +780,9 @@ if uploaded_file is not None:
                             def generar_tabla_semanas_filas(df_source, tipo_tabla="Unidades"):
                                 """Genera tabla con Semanas en filas y variables en columnas."""
                                 df = df_source.copy()
-                                df['Semana'] = df['Semana'].astype(str)
+                                
+                                # Formateamos a 2 decimales solo para la visualización, el orden previo ya se hizo numéricamente
+                                df['Semana'] = df['Semana'].apply(lambda x: f"{x:.2f}" if isinstance(x, (int, float)) else str(x))
                                 
                                 if tipo_tabla == "Unidades":
                                     cols = ['Semana', 'Reses Int', 'Reses Comp']
@@ -958,7 +950,10 @@ if uploaded_file is not None:
                         st.subheader("Detalle por Semana y Planta")
                         st.dataframe(
                             df_transporte.style.format({
-                                'Semana': '{:.2f}',  # <--- ESTA LÍNEA ELIMINA LOS CEROS EXTRA
+                                'st.subheader("Detalle por Semana y Planta")
+                        st.dataframe(
+                            df_transporte.style.format({
+                                'Semana': '{:.2f}',  # <--- COMO YA ES NÚMERO, ESTO FUNCIONARÁ PERFECTO
                                 'Viajes Integrados': '{:,.0f}',
                                 'Viajes Comprados': '{:,.0f}',
                                 'Costo por Viaje Int ($)': '${:,.0f}',
@@ -1219,6 +1214,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
