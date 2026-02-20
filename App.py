@@ -67,10 +67,15 @@ def procesar_archivo(uploaded_file):
         excel_data = pd.ExcelFile(uploaded_file)
         dfs = {}
         
-        # Leemos el Excel de forma natural, para que 'SEMANA' siga siendo numérico (Float)
         for sheet_name in excel_data.sheet_names:
-            dfs[sheet_name] = pd.read_excel(excel_data, sheet_name=sheet_name)
-            dfs.columns = df.columns.str.strip()
+            # 1. Leer la hoja de Excel y guardarla en la variable 'df'
+            df = pd.read_excel(excel_data, sheet_name=sheet_name)
+            
+            # 2. Limpiar espacios en blanco accidentales en los nombres de las columnas
+            df.columns = df.columns.str.strip()
+            
+            # 3. Guardar la hoja ya limpia en el diccionario de resultados
+            dfs[sheet_name] = df
             
         return dfs
     except Exception as e:
@@ -1212,6 +1217,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
