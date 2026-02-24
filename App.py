@@ -102,14 +102,14 @@ def crear_diccionario_rdto_total(inputs_opt_res):
     # Fusionar los DataFrames
     df_merged = pd.merge(
         df_merma_tte,
-        df_mermas_plantas[['PLANTA', 'M_CANAL_CALIENTE', 'M_CANAL_FRIO']],
+        df_mermas_plantas[['PLANTA', 'R_CANAL_CALIENTE', 'M_FRIO']],
         on='PLANTA',
         how='left'
     )
     
     # Calcular rendimiento total
-    df_merged['RENDIMIENTO'] = 1 - (
-        (1 - df_merged['MERMA']) * (1 - df_merged['M_CANAL_CALIENTE'].fillna(0)) * (1 - df_merged['M_CANAL_FRIO'].fillna(0))
+    df_merged['RENDIMIENTO'] = (
+        (1 - df_merged['MERMA']) * (df_merged['R_CANAL_CALIENTE'].fillna(0)) * (1 - df_merged['M_FRIO'].fillna(0))
     )
     
     # Crear diccionario
@@ -1205,8 +1205,8 @@ with st.expander("Descargar plantilla de Excel"):
 
         pd.DataFrame({
             'PLANTA': Plantas,
-            'M_CANAL_CALIENTE': 0.01,
-            'M_CANAL_FRIO': 0.01
+            'R_CANAL_CALIENTE': 0.01,
+            'M_FRIO': 0.01
         }).to_excel(writer, sheet_name='MERMA.PLANTA', index=False)
    
     
@@ -1217,6 +1217,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
