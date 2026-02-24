@@ -600,7 +600,20 @@ if uploaded_file is not None:
                         'Diferencia ($)': diff,
                         'Var. (%)': pct
                     })
+                    
+                val_kg_opt = kpis_opt['Total Kg']
+                val_kg_agua = escenario_b['Total Kg']
                 
+                diff_kg_total = val_kg_opt - val_kg_agua
+                pct_kg_total = (diff_kg_total / val_kg_agua) if val_kg_agua != 0 else 0.0
+
+                data_unificada.append({
+                    'Concepto': 'Total Kg Aprovechados',
+                    'Escenario Óptimo': val_kg_opt, 
+                    'Escenario Aguachica': val_kg_agua,
+                    'Diferencia ($)': diff_kg_total,
+                    'Var. (%)': pct_kg_total
+                })
                 # --- AGREGAR LA FILA FINAL A LA TABLA ---
                 diff_kg = costo_final_kg_opt - costo_final_kg_agua
                 pct_kg = (diff_kg / costo_final_kg_agua) if costo_final_kg_agua != 0 else 0
@@ -623,7 +636,7 @@ if uploaded_file is not None:
                     })
                     
                     def color_var(val, concepto):
-                        if 'Valorización' in concepto or 'Valor Carne' in concepto:
+                        if 'Valorización' in concepto or 'Valor Carne' in concepto or 'Total Kg' in concepto:
                             color = '#2ca02c' if val > 0 else '#d62728'
                         else:
                             # Para costos: si dif es negativa (Opt < Agua), es bueno (Verde)
@@ -1217,6 +1230,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
