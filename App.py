@@ -636,8 +636,8 @@ if uploaded_file is not None:
                         'Var. (%)': '{:.2%}'
                     })
                     
-                    # 2. NUEVO: Sobrescribir el formato SOLO para la fila de Kilos (Sin $)
-                    # Buscamos en qué número de fila quedó "Total Kg"
+                    # 2. CORRECCIÓN: Formato especial para la fila de 'Total Kg'
+                    # Le decimos explícitamente: "Los valores son números normales, PERO la variación sigue siendo %"
                     fila_kg = df_comparativo.index[df_comparativo['Concepto'].str.contains("Total Kg")].tolist()
                     
                     if fila_kg:
@@ -645,12 +645,13 @@ if uploaded_file is not None:
                             {
                                 'Escenario Óptimo': '{:,.0f}',      # Sin signo $
                                 'Escenario Aguachica': '{:,.0f}',   # Sin signo $
-                                'Diferencia ($)': '{:,.0f}'         # Sin signo $
+                                'Diferencia ($)': '{:,.0f}',        # Sin signo $
+                                'Var. (%)': '{:.2%}'                # <--- ESTA LÍNEA ASEGURA QUE SE VEA COMO %
                             }, 
                             subset=pd.IndexSlice[fila_kg, :] # Aplica solo a esa fila
                         )
 
-                    # 3. Lógica de Colores (Igual que antes)
+                    # 3. Lógica de Colores
                     def color_var(val, concepto):
                         # Agregamos 'Total Kg' a la lógica de "Más es mejor" (Verde)
                         if 'Valorización' in concepto or 'Valor Carne' in concepto or 'Total Kg' in concepto:
@@ -1249,6 +1250,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
