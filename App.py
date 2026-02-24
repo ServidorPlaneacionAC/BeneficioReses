@@ -628,6 +628,7 @@ if uploaded_file is not None:
                 df_comparativo = pd.DataFrame(data_unificada)
 
                 def estilo_comparativo_final(df_styler):
+                    # 1. Aplicamos formato de Moneda ($) a TODO por defecto
                     styler = df_styler.format({
                         'Escenario Óptimo': '${:,.0f}',
                         'Escenario Aguachica': '${:,.0f}',
@@ -635,18 +636,36 @@ if uploaded_file is not None:
                         'Var. (%)': '{:.2%}'
                     })
                     
+                    # 2. NUEVO: Sobrescribir el formato SOLO para la fila de Kilos (Sin $)
+                    # Buscamos en qué número de fila quedó "Total Kg"
+                    fila_kg = df_comparativo.index[df_comparativo['Concepto'].str.contains("Total Kg")].tolist()
+                    
+                    if fila_kg:
+                        styler.format(
+                            {
+                                'Escenario Óptimo': '{:,.0f}',      # Sin signo $
+                                'Escenario Aguachica': '{:,.0f}',   # Sin signo $
+                                'Diferencia ($)': '{:,.0f}'         # Sin signo $
+                            }, 
+                            subset=pd.IndexSlice[fila_kg, :] # Aplica solo a esa fila
+                        )
+
+                    # 3. Lógica de Colores (Igual que antes)
                     def color_var(val, concepto):
+                        # Agregamos 'Total Kg' a la lógica de "Más es mejor" (Verde)
                         if 'Valorización' in concepto or 'Valor Carne' in concepto or 'Total Kg' in concepto:
                             color = '#2ca02c' if val > 0 else '#d62728'
                         else:
-                            # Para costos: si dif es negativa (Opt < Agua), es bueno (Verde)
+                            # Para costos: Menos es mejor (Verde si es negativo)
                             color = '#2ca02c' if val < 0 else '#d62728'
                         return f'color: {color}; font-weight: bold'
 
                     styler.apply(lambda x: [color_var(x['Var. (%)'], x['Concepto']) if col == 'Var. (%)' else '' for col in x.index], axis=1)
+                    
+                    # Negritas y fondos
                     styler.apply(lambda x: ['background-color: #f0f0f0; font-weight: bold' if x['Concepto'] == 'Valorización Total' else '' for _ in x], axis=1)
-                    # Resaltar la fila nueva de Costo por Kg
                     styler.apply(lambda x: ['background-color: #e6f3ff; font-weight: bold; border-top: 2px solid #000' if 'Costo Final' in x['Concepto'] else '' for _ in x], axis=1)
+                    
                     return styler
 
                 st.dataframe(estilo_comparativo_final(df_comparativo.style), use_container_width=True)
@@ -1230,6 +1249,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
