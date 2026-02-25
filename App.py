@@ -356,7 +356,7 @@ if uploaded_file is not None:
         if st.button("Ejecutar Modelo de Optimización"):
             with st.spinner("Ejecutando modelo, por favor espere..."):
                 start_time = time.time()
-                modelo, contexto, costos = ejecutar_modelo(current_data, valor_kg, MinCompra)
+                modelo, contexto, costos = ejecutar_modelo(current_data, valor_kg, MinCompra, MinAgua)
                 execution_time = time.time() - start_time
             
             if modelo is not None and costos is not None:
@@ -1255,6 +1255,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
