@@ -121,7 +121,7 @@ def crear_diccionario_rdto_total(inputs_opt_res):
     return rdto_total
 
 # Función principal del modelo
-def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
+def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra, MinAgua):
     try:
         # Definición de conjuntos
         Zona = list(set(inputs_opt_res['OFT.INTEGRADAS']['ZONA']))
@@ -200,6 +200,10 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra):
         for p in Planta_S:
             for t in Semana:
                 modelo += (lpSum(res_int[z,p,t] for z in Zona) + lpSum(res_comp[z,p,t] for z in Zona)) <= viaje_envigado[p,t] * 84
+
+        for t in Semana:
+            modelo += (lpSum(res_int[z,'AGUACHICA',t] for z in Zona) + lpSum(res_comp[z,AGUACHICA',t] for z in Zona)) >= MinAgua
+
                 
         # Resolver el modelo
         modelo.solve(PULP_CBC_CMD(timeLimit=180))
@@ -317,6 +321,7 @@ with st.sidebar:
     uploaded_file = st.file_uploader("Cargar archivo Excel con parámetros", type=['xlsx', 'xls'])
     valor_kg = st.number_input("Valor comercial de Kg de carne ($)", min_value=0.0, value=22000.0, step=1000.0)
     MinCompra = st.number_input("Cantidad mínima viable para compra de reses", min_value=0.0, value=14.0, step=1.0)
+    MinAgua = st.number_input("Cantidad mínima viable para beneficiar en Aguachica", min_value=0.0, value=1400.0, step=1.0)
         
     if uploaded_file is not None:
         st.success("Archivo cargado correctamente")
@@ -1250,6 +1255,7 @@ with st.expander("Descargar plantilla de Excel"):
         mime="application/vnd.ms-excel"
 
     )
+
 
 
 
