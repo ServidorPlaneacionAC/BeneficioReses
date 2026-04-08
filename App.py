@@ -870,9 +870,9 @@ if uploaded_file is not None:
                                         cols_subtotales = [c for c in df_view.columns if 'SUBTOTAL' in c]
                                         
                                         # Aplicar colores a las columnas
-                                        styler.applymap(lambda x: 'color: #d62728;', subset=cols_costos) # Rojo
-                                        styler.applymap(lambda x: 'color: #2ca02c;', subset=cols_ingresos) # Verde
-                                        styler.applymap(lambda x: 'font-weight: bold; background-color: #f0f0f0; color: black;', subset=cols_subtotales)
+                                        styler.map(lambda x: 'color: #d62728;', subset=cols_costos) # Rojo
+                                        styler.map(lambda x: 'color: #2ca02c;', subset=cols_ingresos) # Verde
+                                        styler.map(lambda x: 'font-weight: bold; background-color: #f0f0f0; color: black;', subset=cols_subtotales)
                                         
                                         # CORRECCIÓN AQUÍ: Función para resaltar la fila TOTAL sin usar subset problemático
                                         def highlight_total_row(row):
