@@ -162,15 +162,15 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra, MinAgua):
         compra_res = LpVariable.dicts('compra_res',[(z,p,t) for z in Zona for p in Planta_S for t in Semana],cat='Binary')
 
         # Función objetivo
-        modelo += (lpsum(res_int[z,p,t] * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg for z in Zona for p in Planta_S for t in Semana) +
-                   lpsum(res_comp[z,p,t] * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg for z in Zona for p in Planta_S for t in Semana) -
-                   lpsum(res_int[z,p,t] * Precio_Int.get((z),0) for z in Zona for p in Planta_S for t in Semana) -
-                   lpsum(res_comp[z,p,t] * Precio_Comp.get((z),0) for z in Zona for p in Planta_S for t in Semana) -
-                   lpsum(res_int[z,p,t] * Costo_Sac.get((p),0) for z in Zona for p in Planta_S for t in Semana) -
-                   lpsum(res_comp[z,p,t] * Costo_Sac.get((p),0) for z in Zona for p in Planta_S for t in Semana) -
-                   lpsum(viaje_int[z,p,t] * Costo_Viaje_Int.get((z,p),0) for z in Zona for p in Planta_S for t in Semana) -
-                   lpsum(viaje_com[z,p,t] * Costo_Viaje_Comp.get((z,p),0) for z in Zona for p in Planta_S for t in Semana) -
-                   lpsum(viaje_envigado[p,t] * Costo_Tans_PT.get((p),0) for p in Planta_S for t in Semana)
+        modelo += (lpSum(res_int[z,p,t] * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg for z in Zona for p in Planta_S for t in Semana) +
+                   lpSum(res_comp[z,p,t] * Peso_Res.get((z),0) * rdto.get((z,p),0) * valor_kg for z in Zona for p in Planta_S for t in Semana) -
+                   lpSum(res_int[z,p,t] * Precio_Int.get((z),0) for z in Zona for p in Planta_S for t in Semana) -
+                   lpSum(res_comp[z,p,t] * Precio_Comp.get((z),0) for z in Zona for p in Planta_S for t in Semana) -
+                   lpSum(res_int[z,p,t] * Costo_Sac.get((p),0) for z in Zona for p in Planta_S for t in Semana) -
+                   lpSum(res_comp[z,p,t] * Costo_Sac.get((p),0) for z in Zona for p in Planta_S for t in Semana) -
+                   lpSum(viaje_int[z,p,t] * Costo_Viaje_Int.get((z,p),0) for z in Zona for p in Planta_S for t in Semana) -
+                   lpSum(viaje_com[z,p,t] * Costo_Viaje_Comp.get((z,p),0) for z in Zona for p in Planta_S for t in Semana) -
+                   lpSum(viaje_envigado[p,t] * Costo_Tans_PT.get((p),0) for p in Planta_S for t in Semana)
                   )
                           
         
