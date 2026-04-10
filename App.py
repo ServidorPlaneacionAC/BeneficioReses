@@ -206,7 +206,7 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra, MinAgua):
 
                 
         # Resolver el modelo
-        modelo.solve(PULP_CBC_CMD(timeLimit=180))
+        modelo.solve(PULP_CBC_CMD())
         
         # Preparar resultados
         contexto = {
