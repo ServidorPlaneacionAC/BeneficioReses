@@ -202,7 +202,7 @@ def ejecutar_modelo(inputs_opt_res, valor_kg, MinCompra, MinAgua):
                 modelo += (lpSum(res_int[z,p,t] for z in Zona) + lpSum(res_comp[z,p,t] for z in Zona)) <= viaje_envigado[p,t] * 84
 
         for t in Semana:
-            modelo += (lpSum(res_int[z,'AGUACHICA',t] for z in Zona) + lpSum(res_comp[z,'AGUACHICA',t] for z in Zona)) <= MinAgua
+            modelo += (lpSum(res_int[z,'AGUACHICA',t] for z in Zona) + lpSum(res_comp[z,'AGUACHICA',t] for z in Zona)) >= MinAgua
 
                 
         # Resolver el modelo
